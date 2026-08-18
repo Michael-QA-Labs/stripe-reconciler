@@ -145,3 +145,18 @@ gh repo view <name> --json visibility -q .visibility
 
 This is also a ship gate item, since the gate deliberately flips the repo public
 and that step must be the only thing that ever does.
+
+## D-012: Render config is a committed `render.yaml`, not dashboard-only
+**Stage** 01 | **Date** 2026-08-18
+
+The service is configured by a Blueprint file in the repo rather than by hand in
+the Render dashboard. Three reasons: the config is reviewable in a clone, the
+`TESTING=false` gate on `GET /test/payments/{id}` is visible next to the code it
+protects rather than buried in a web form, and stage 07 becomes a redeploy
+instead of a reconfiguration.
+
+Secrets stay out of the file. `STRIPE_SECRET_KEY` and
+`STRIPE_WEBHOOK_SECRET_DASHBOARD` are declared with `sync: false`, which tells
+Render to prompt for the value once and keep it in its own store.
+`STRIPE_WEBHOOK_SECRET_CLI` is deliberately absent: it backs `stripe listen`
+locally and has no meaning on the deployed endpoint.

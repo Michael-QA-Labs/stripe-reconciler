@@ -1,0 +1,31 @@
+# Render Blueprint. The deploy config lives here rather than only in the Render
+# dashboard, so a clone can see how the live service is configured and stage 07
+# redeploys instead of reconfiguring. See D-012.
+
+services:
+  - type: web
+    name: stripe-reconciler
+    runtime: python
+    plan: free
+    # Free tier spins down when idle and wipes the filesystem on every spin-down
+    # and redeploy, so payments.db is not durable here. Deliberate, see D-005.
+    healthCheckPath: /health
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn service.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      # 3.13 is pinned for the whole project, see D-001.
+      - key: PYTHON_VERSION
+        value: 3.13.13
+      # Must stay false anywhere public. It gates GET /test/payments/{id},
+      # which is the one route in this service that must not ship open.
+      - key: TESTING
+        value: "false"
+      # sync: false means Render prompts for the value once and never stores it
+      # in this file. Both are set in the Render dashboard, not here.
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      # The DASHBOARD secret, not the CLI one. They are not interchangeable.
+      # This value does not exist until the webhook endpoint is registered
+      # against the deployed URL, so the first deploy leaves it blank.
+      - key: STRIPE_WEBHOOK_SECRET_DASHBOARD
+        sync: false
