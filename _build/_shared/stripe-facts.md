@@ -14,6 +14,7 @@ a stale number here would silently poison the suites that depend on it.
 | CLI key expiry | 2026-11-16 (90 days from `stripe login`) | CLI config |
 | CLI signing secret | in `.env`, never here | `stripe listen --print-secret` |
 | Dashboard signing secret | in `.env`, captured at stage 01 | Dashboard webhook settings, destination `render-deployment` |
+| Registered events | 10: eight `payment_intent.*`, `checkout.session.completed`, `charge.refunded` | destination `render-deployment`, snapshot payloads |
 
 These are settled. Do not re-derive them mid-stage. Pin the API version as a
 literal constant in `service/config.py` at stage 01, so captured fixtures cannot

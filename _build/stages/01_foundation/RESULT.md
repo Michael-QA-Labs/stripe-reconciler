@@ -131,11 +131,12 @@ gate. Only the two `sync: false` secrets were entered by hand.
    handler exists, so no test can fail on it today. **Stage 04a must wire this
    up**, and should do so test-first rather than discovering it mid-handler.
 
-2. **Refund events are not registered on the destination.** The nine selected
-   events are the eight `payment_intent.*` plus `checkout.session.completed`.
-   Refunds arrive as `charge.refunded`, which stage 03 exercises. Deferred on
-   purpose: the transition table does not exist yet, so what the receiver needs
-   is not yet decided. Adding events to a destination is a two-click edit.
+2. **Refund events, partially registered.** `charge.refunded` was added to the
+   destination on 2026-08-18, after stage close, bringing it to 10 events.
+   `refund.created` and `refund.updated` are still absent: whether the receiver
+   needs them depends on whether the table treats a pending refund as a distinct
+   state, which is stage 02's question. Editing a destination's event list
+   changes neither its URL nor its signing secret.
 
 3. **The dashboard signing secret is set but unproven.** Nothing verifies its
    value until a signed delivery is checked against it, which first happens in
