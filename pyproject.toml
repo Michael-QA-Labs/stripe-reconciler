@@ -1,0 +1,12 @@
+[tool.pytest.ini_options]
+# Lets tests import `service` without installing the package.
+pythonpath = ["."]
+testpaths = ["tests"]
+# Conventions call for pristine output, so warnings are errors. A new warning
+# is a signal, not noise to scroll past.
+filterwarnings = ["error"]
+markers = [
+    # Hits the real Stripe API. Runs serially: sandbox is capped at 25 req/s.
+    # Stage 07's CI splits on this marker, so it must stay accurate.
+    "live: talks to live Stripe test mode",
+]
