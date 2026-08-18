@@ -13,7 +13,7 @@ a stale number here would silently poison the suites that depend on it.
 | Account | sandbox `QA sandbox`, `acct_1U5diKQqVBpO9CGf` | `stripe config --list` |
 | CLI key expiry | 2026-11-16 (90 days from `stripe login`) | CLI config |
 | CLI signing secret | in `.env`, never here | `stripe listen --print-secret` |
-| Dashboard signing secret | in `.env`, empty until stage 01 deploys | Dashboard webhook settings |
+| Dashboard signing secret | in `.env`, captured at stage 01 | Dashboard webhook settings, destination `render-deployment` |
 
 These are settled. Do not re-derive them mid-stage. Pin the API version as a
 literal constant in `service/config.py` at stage 01, so captured fixtures cannot
@@ -56,6 +56,18 @@ This is the single most common way to lose an afternoon on this project.
 
 Both are named distinctly in `.env.example` from stage 00 onward. A signature
 test failing for no apparent reason is this, roughly every time.
+
+**They are different lengths, which is how to tell them apart without printing
+either one.** Measured at stage 01: the CLI secret is 70 characters, the
+dashboard secret is 38. Both start `whsec_`, so the prefix proves nothing. To
+check which one a file holds:
+
+```
+awk -F= '/^STRIPE_WEBHOOK_SECRET/{v=substr($0,index($0,"=")+1); print $1, length(v)}' .env
+```
+
+70 means CLI, 38 means dashboard. This satisfies `D-010`: it identifies a secret
+without ever putting its value on screen.
 
 ## Signature verification
 
