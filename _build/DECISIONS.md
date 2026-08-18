@@ -127,3 +127,21 @@ Standing rules from this:
 - `.env` is written by **piping** values into the file under `umask 077`, never
   by echoing them into a shell first.
 - Verify `.env` with `wc -l`, never `cat`.
+
+## D-011: Verify repo visibility, do not trust the `--private` flag
+**Stage** 00 | **Date** 2026-08-18
+
+`gh repo create stripe-reconciler --private --source=. --push` reported "Name
+already exists on this account" and the repo landed **PUBLIC**, despite the
+flag. Likely an account-level default visibility winning over it. Caught
+immediately and flipped with `gh repo edit --visibility private`. The repo was
+empty (0KB, nothing ever pushed) for the whole window, so nothing was exposed.
+
+Standing rule: after any repo creation, assert visibility rather than assume it.
+
+```
+gh repo view <name> --json visibility -q .visibility
+```
+
+This is also a ship gate item, since the gate deliberately flips the repo public
+and that step must be the only thing that ever does.
