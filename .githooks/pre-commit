@@ -1,0 +1,36 @@
+#!/bin/sh
+# Blocks commits containing Stripe keys or other secret material.
+#
+# .gitignore covers .env. It does nothing about a key pasted into config.py,
+# a test fixture, or a debugging print. That is the realistic failure, so this
+# scans staged content rather than filenames.
+#
+# Enabled by: git config core.hooksPath .githooks
+# Override (only for a literal placeholder): git commit --no-verify
+
+PATTERN='sk_live_[A-Za-z0-9]|sk_test_[A-Za-z0-9]|pk_live_[A-Za-z0-9]|rk_live_[A-Za-z0-9]|whsec_[A-Za-z0-9]{8}|-----BEGIN [A-Z ]*PRIVATE KEY'
+
+# Only added lines. Removing a leaked key should never be blocked.
+HITS=$(git diff --cached --unified=0 | grep -E '^\+' | grep -vE '^\+\+\+' | grep -nE "$PATTERN")
+
+if [ -n "$HITS" ]; then
+    echo ""
+    echo "BLOCKED: staged changes contain a secret pattern"
+    echo ""
+    echo "$HITS" | sed 's/^/  /'
+    echo ""
+    echo "Move it to .env and read it through service/config.py."
+    echo "If this is genuinely a placeholder: git commit --no-verify"
+    echo ""
+    exit 1
+fi
+
+# .env must never be staged, whatever .gitignore says (git add -f bypasses it).
+if git diff --cached --name-only | grep -qE '(^|/)\.env$'; then
+    echo ""
+    echo "BLOCKED: .env is staged. Unstage it: git restore --staged .env"
+    echo ""
+    exit 1
+fi
+
+exit 0

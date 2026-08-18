@@ -1,0 +1,19 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+
+# SQLite runs in WAL mode, which creates these sidecars beside the database.
+*.db
+*.db-wal
+*.db-shm
+
+# Playwright artifacts
+test-results/
+playwright-report/
+
+# Allure
+allure-results/
+allure-report/
+
+.DS_Store
