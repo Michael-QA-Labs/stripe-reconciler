@@ -92,6 +92,10 @@ v1 is done, and goes on the resume, when:
       `git log -p | grep -nE 'sk_(live|test)_[A-Za-z0-9]|whsec_[A-Za-z0-9]{8}'`
       The pre-commit hook (`D-008`) only guards commits made with it enabled.
       This is the check that the repo is safe to make public.
+- [ ] **A demo exists and has been run end to end**, not just a live URL that
+      serves JSON. Someone opening the repo should be able to watch the thing
+      work. What exactly the demo is gets defined at stage 05, once hosted
+      Checkout exists and there is a flow worth showing.
 - [ ] Repo flipped public, and only then
 
 Then v2 (original steps 8 to 14) gets its own plan. Not before.

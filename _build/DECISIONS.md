@@ -160,3 +160,22 @@ Secrets stay out of the file. `STRIPE_SECRET_KEY` and
 Render to prompt for the value once and keep it in its own store.
 `STRIPE_WEBHOOK_SECRET_CLI` is deliberately absent: it backs `stripe listen`
 locally and has no meaning on the deployed endpoint.
+
+## D-013: `/docs` and `/openapi.json` stay publicly served
+**Stage** 01 | **Date** 2026-08-18
+
+FastAPI serves interactive Swagger UI at `/docs` by default. It is left on
+deliberately rather than disabled in production.
+
+The repo is a portfolio artifact, and a live link where someone can see and
+exercise the API surface is worth more than the small amount of information it
+reveals. There is nothing sensitive behind it: the schema lists exactly three
+routes, and the test-only introspection endpoint is absent from it entirely,
+which is itself the clearest available evidence that the `TESTING` gate is
+structural rather than a status code.
+
+Standing preference this reflects: where a choice trades a little exposure for
+something a reader can see and click, the visible option wins on this project.
+
+Revisit only if the service ever holds real data, which under `D-005` it does
+not.

@@ -142,15 +142,13 @@ gate. Only the two `sync: false` secrets were entered by hand.
    stage 04a. If signature verification fails there, suspect this before
    suspecting the code, and check the length tell first.
 
-4. **`/docs` and `/openapi.json` are publicly served** on the deployment,
-   FastAPI's default. Left on deliberately: a working Swagger UI is an asset on
-   a portfolio link, and the schema confirms the test route is absent. Recorded
-   so that it reads as a decision rather than an oversight. Revisit at the ship
-   gate if the README's framing changes.
+4. **`/docs` and `/openapi.json` are publicly served.** Settled, see `D-013`.
 
 5. **The `workflow` token scope is still missing**, carried forward from stage
    00. `gh auth refresh -s workflow` before stage 07 pushes `.github/workflows/`.
 
 6. **D-005's ephemeral filesystem note has not reached the README yet.** The
    README currently carries the framing paragraph only. The live URL is a demo
-   endpoint and the README must say so before the repo goes public.
+   endpoint and the README must say so before the repo goes public. Related: the
+   ship gate now also requires a demo that has been run end to end, not just a
+   live URL, with the demo itself defined at stage 05.
