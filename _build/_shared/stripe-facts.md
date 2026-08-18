@@ -4,16 +4,46 @@ Every fact here carries a source. Volatile ones are **captured at stage 00 from
 the actual account and CLI**, not asserted from memory, because they change and
 a stale number here would silently poison the suites that depend on it.
 
-## Capture at stage 00 (currently unfilled)
+## Captured at stage 00, 2026-08-18
 
-| Fact | Value | How to capture |
+| Fact | Value | Source |
 |---|---|---|
-| Pinned API version | _TBD at stage 00_ | Dashboard → Developers → API version, or `stripe --version` plus the account default. Record the exact string. |
+| **Pinned API version** | **`2026-07-29.dahlia`** | `stripe-version` response header on a live call to `/v1/balance` |
+| Stripe CLI | 1.50.1 (brew `stripe-cli`) | `stripe --version` |
+| Account | sandbox `QA sandbox`, `acct_1U5diKQqVBpO9CGf` | `stripe config --list` |
+| CLI key expiry | 2026-11-16 (90 days from `stripe login`) | CLI config |
 | CLI signing secret | in `.env`, never here | `stripe listen --print-secret` |
-| Dashboard signing secret | in `.env`, never here | Dashboard → Webhooks → the Render endpoint, after stage 01 deploys |
-| Test-mode rate limit | _TBD at stage 00_ | Stripe docs, rate limits page. Around 25 req/s historically; confirm before relying on it. |
+| Dashboard signing secret | in `.env`, empty until stage 01 deploys | Dashboard webhook settings |
 
-Once filled, these are settled. Do not re-derive them mid-stage.
+These are settled. Do not re-derive them mid-stage. Pin the API version as a
+literal constant in `service/config.py` at stage 01, so captured fixtures cannot
+silently rot when Stripe ships a change.
+
+## Rate and concurrency limits
+
+Verified against https://docs.stripe.com/rate-limits on 2026-08-18.
+
+| Limit | Value |
+|---|---|
+| Global, **sandbox** | **25 requests/second** (live mode is 100) |
+| Individual endpoint | 25 requests/second |
+| **PaymentIntents updates** | **1000 per PaymentIntent object, per hour** |
+
+That PaymentIntent cap matters for stage 04b. The concurrency case fires many
+events at a *single* payment, so if any variant of it ever talks to Stripe
+rather than to our own receiver, it can hit a per-object ceiling that looks
+nothing like a global rate limit.
+
+**A 429 is not always a rate limit.** Responses carry a
+`Stripe-Rate-Limited-Reason` header (`global-rate`, `endpoint-rate`,
+`global-concurrency`, `endpoint-concurrency`, `resource-specific`). A 429
+**without** that header, with code `lock_timeout`, means another request or an
+internal Stripe process holds a lock on the object. Different cause, similar
+mitigation. Worth distinguishing in stage 11's error taxonomy (v2) rather than
+lumping all 429s together.
+
+Live-API suites run serially. Suites hitting our own receiver with locally
+signed payloads never touch Stripe and parallelize freely.
 
 ## Two signing secrets, and they are not interchangeable
 
@@ -57,8 +87,3 @@ test failing for no apparent reason is this, roughly every time.
 - Stage 06 tests **our** idempotency implementation, not Stripe's. The
   distinction matters when writing the README.
 
-## Rate limits and parallelism
-
-- Live-API suites (stage 03, and stage 11 in v2) run **serially**.
-- Suites that hit our own receiver with locally signed payloads never touch
-  Stripe and parallelize freely.
