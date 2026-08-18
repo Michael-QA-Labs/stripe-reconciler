@@ -100,3 +100,30 @@ after `_build/` is reviewed file by file, since the factory ships with the repo
 (`D-004`) and stage `RESULT.md` files will accumulate working notes over three
 to five weeks. Anything reading as private rather than as process gets cut at
 that review. The scrub is a ship gate checklist item, not an intention.
+
+## D-010: Secrets are piped, never echoed. First test key rolled
+**Stage** 00 | **Date** 2026-08-18
+
+`stripe config --list` prints `test_mode_api_key` in full. It was run once
+during stage 00 setup, putting that key into a terminal transcript.
+
+The key turned out to be a **restricted** key minted by `stripe login`, valid 90
+days, listed under *Restricted keys* on the dashboard API keys page under the
+device name `Mac`. Not the account's standard secret key, which is why the
+Standard keys rows offered no roll option and the first attempt to fix this
+looked in the wrong place.
+
+It was **revoked** in the dashboard on 2026-08-18 rather than left to expire,
+even though it was sandbox-scoped, permission-restricted, and already expiring
+2026-11-16. Confirmed dead: `stripe balance retrieve` fails against it.
+
+The reasoning is habit, not blast radius. "It was only test mode" is the
+argument that fails later, on a key where it matters.
+
+Standing rules from this:
+
+- Never run `stripe config --list` bare. To check a key exists:
+  `stripe config --list | grep -c test_mode_api_key`.
+- `.env` is written by **piping** values into the file under `umask 077`, never
+  by echoing them into a shell first.
+- Verify `.env` with `wc -l`, never `cat`.
