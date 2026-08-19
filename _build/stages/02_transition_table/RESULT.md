@@ -103,11 +103,12 @@ the cancel endpoint, refund event behaviour from the refunds guide.
    `refund.failed`. `charge.refunded` alone carries the single `refunded` state
    v1 has. No further destination changes are needed.
 
-3. **Real reconcilers refetch on anomaly.** Events are notifications; the API is
-   the source of truth. When `apply()` reports `legal=False`, a production
-   receiver would fetch the PaymentIntent from Stripe rather than trusting the
-   payload. The flag is the natural hook. Earliest sensible home is stage 04a,
-   since nothing in the receiver calls the Stripe API yet. Not built here.
+3. **Anomaly handling is settled, see `D-015`.** At 04a: flag, log, persist the
+   anomaly, and define a `fetch_payment_intent` seam that is never called.
+   Refetching itself is v2, out of band. Keeps `state_machine.py` pure, keeps
+   the webhook response off the network, and keeps the anomaly path testable
+   without live Stripe. 04a's contract now lists `DECISIONS.md` as an input,
+   which it did not before, so this is actually reachable from that stage.
 
 4. **`requires_confirmation` has no event and is unverified empirically.** No
    webhook can produce it. Stage 03 creates PaymentIntents directly and is the

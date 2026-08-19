@@ -216,3 +216,32 @@ actually happen.
 
 Cheap to reverse: one integer in `STATE_RANK` and one row in the table, with
 `test_state_ranks_match_the_table` failing if only one is changed.
+
+## D-015: Anomalies are persisted and surfaced at 04a, refetch is deferred to v2
+**Stage** 02 (for 04a) | **Date** 2026-08-19
+
+`apply()` reports `legal=False` when an event is applied over `canceled`
+(`D-014`). A production reconciler would treat events as notifications and
+refetch the PaymentIntent from the API before trusting one. That behaviour is
+right, and building it at 04a is not.
+
+**At 04a**: flag, log via `log_state_transition()`, and persist the anomaly so it
+survives a restart and is queryable. Define the handler to accept a
+`fetch_payment_intent` callable that defaults to `None` and is never called.
+
+**At v2**: wire a real fetcher, invoked out of band via `BackgroundTasks`.
+
+Three constraints this protects, each of which is expensive to undo:
+
+- **`service/state_machine.py` stays pure.** It imports nothing from `stripe`.
+  That is what lets 04b, and later Hypothesis and mutmut, use it as an oracle
+  with no fixtures and no network.
+- **The webhook response never blocks on a network call.** Stripe retries slow
+  or failed responses, so a blocking refetch would manufacture the duplicate
+  deliveries this project exists to handle.
+- **The anomaly path never requires live Stripe to test.** Sandbox is capped at
+  25 req/s with 1000 updates per PaymentIntent per hour, so a live-dependent
+  anomaly test is flaky in CI by construction. An injected fake covers it
+  offline; one `@pytest.mark.live` test proves the real client separately.
+
+The seam is the point: turning refetching on later becomes wiring, not redesign.

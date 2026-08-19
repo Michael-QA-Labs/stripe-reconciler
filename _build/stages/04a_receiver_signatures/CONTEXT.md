@@ -16,6 +16,7 @@ Timebox: 2 to 4 focused days.
 - Working (from stage 02): ../../../service/state_machine.py
 - Reference (every run): ../../_shared/conventions.md
 - Reference (signature scheme, the two secrets, tolerance): ../../_shared/stripe-facts.md
+- Reference (read D-014 and D-015, anomaly handling): ../../DECISIONS.md
 
 Do NOT load: `../../_shared/scope-original.md`, `../04b_reorder_race/CONTEXT.md`,
 anything Playwright. Ordering and concurrency are the next stage; mixing them in
