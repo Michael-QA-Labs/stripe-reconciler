@@ -179,3 +179,40 @@ something a reader can see and click, the visible option wins on this project.
 
 Revisit only if the service ever holds real data, which under `D-005` it does
 not.
+
+## D-014: `succeeded` outranks `canceled`
+**Stage** 02 | **Date** 2026-08-19
+
+The only rank in `docs/transition-table.md` that Stripe's documentation does not
+decide. Stripe forbids the transition ("a PaymentIntent can't be canceled after
+it has succeeded"), so it has no position on what a receiver should record if it
+ever sees the contradiction.
+
+The contradiction only arises from our own side: two PaymentIntents conflated
+through the session mapping, a replayed payload, or a case stage 04b builds
+deliberately.
+
+Decided on the cost asymmetry a real business would face, not on intuition:
+
+- Recording `canceled` for a payment that actually captured money leaves a
+  customer charged with no record of it. That reaches you as a support ticket, a
+  duplicate charge, or a chargeback. Finance hears it from the customer.
+- Recording `succeeded` for a payment that was actually canceled is caught by
+  the next reconciliation sweep against Stripe, which is a thing any real
+  business runs regardless.
+
+Second reason, and the one that would survive if the first were a coin flip:
+this ranking is what keeps the anomaly **visible**. Because `succeeded` is
+higher, the contradictory ordering is applied over `canceled` and flagged
+illegal by the "nothing leaves `canceled`" rule. Rank `canceled` higher instead
+and the contradictory event is absorbed silently, the illegal-transition
+machinery becomes dead code, and a genuine mapping bug in our own receiver
+passes unnoticed.
+
+Scope note: this case is a defensive assertion that catches our bugs. It is not
+a scenario a real business plans for, and the README must not present it
+alongside duplicate, reordered, and late delivery, which are the cases that
+actually happen.
+
+Cheap to reverse: one integer in `STATE_RANK` and one row in the table, with
+`test_state_ranks_match_the_table` failing if only one is changed.

@@ -222,5 +222,7 @@ reference, and the refund event behaviour from the refunds guide.
 
 The one thing no Stripe document decides is `succeeded` outranking `canceled`.
 Stripe forbids that transition, so it has no opinion on what a receiver should
-record if it ever sees it. Ranking `succeeded` higher means a stale
-cancellation can never void a payment that took money.
+record if it ever sees it. That ranking is a deliberate choice, made on the cost
+asymmetry between the two possible errors and on keeping the contradiction
+visible rather than silent. The reasoning is recorded in `_build/DECISIONS.md`
+as `D-014`.
