@@ -20,6 +20,30 @@ These are settled. Do not re-derive them mid-stage. Pin the API version as a
 literal constant in `service/config.py` at stage 01, so captured fixtures cannot
 silently rot when Stripe ships a change.
 
+## Reaching each status, captured 2026-08-19
+
+Probed against the sandbox on the pinned API version, not recalled.
+
+| To reach | Do this | Verified |
+|---|---|---|
+| `requires_payment_method` | create a PaymentIntent with no payment method | yes, probe |
+| `requires_confirmation` | create with `payment_method=pm_card_visa`, do not confirm | yes, probe |
+
+```
+$ stripe payment_intents create --amount=1000 --currency=usd
+  "status": "requires_payment_method"
+
+$ stripe payment_intents create --amount=1000 --currency=usd -d "payment_method=pm_card_visa"
+  "status": "requires_confirmation"
+```
+
+This matters because **no webhook event claims `requires_confirmation`**. There
+is no such event type, so the state is observable only in API responses. Stage
+03 is the first place it can be asserted.
+
+The remaining statuses are reached by the stage 03 lifecycle itself (confirm,
+capture, cancel, refund) and are not pre-captured here.
+
 ## Rate and concurrency limits
 
 Verified against https://docs.stripe.com/rate-limits on 2026-08-18.

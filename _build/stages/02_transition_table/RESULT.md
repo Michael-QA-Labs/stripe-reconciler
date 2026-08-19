@@ -110,10 +110,11 @@ the cancel endpoint, refund event behaviour from the refunds guide.
    without live Stripe. 04a's contract now lists `DECISIONS.md` as an input,
    which it did not before, so this is actually reachable from that stage.
 
-4. **`requires_confirmation` has no event and is unverified empirically.** No
-   webhook can produce it. Stage 03 creates PaymentIntents directly and is the
-   first place it can be observed in an API response, which is the chance to
-   confirm the state is real rather than theoretical.
+4. **`requires_confirmation` is confirmed reachable.** Probed 2026-08-19:
+   creating a PaymentIntent with `payment_method=pm_card_visa` and not
+   confirming it returns `status: requires_confirmation`. Recorded in
+   `_shared/stripe-facts.md`. Still true that no webhook event claims it, so
+   stage 03 asserts it from an API response.
 
 5. **A README boundary, recorded so it cannot drift** (`D-014`). Duplicate,
    reordered, and late delivery are what actually happen to a business and are
