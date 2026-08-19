@@ -2,6 +2,10 @@
 # Lets tests import `service` without installing the package.
 pythonpath = ["."]
 testpaths = ["tests"]
+# Live tests are opt in. A plain `pytest` must stay fast and need no network or
+# secret key, which is also what lets stage 07 run a fixture-only CI job.
+# Run them with: pytest -m live
+addopts = ["-m", "not live"]
 # Conventions call for pristine output, so warnings are errors. A new warning
 # is a signal, not noise to scroll past.
 filterwarnings = ["error"]
