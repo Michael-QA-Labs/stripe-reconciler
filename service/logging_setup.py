@@ -8,8 +8,21 @@ rather than retrofitted mid-debug.
 
 import json
 import logging
+import sys
 
 logger = logging.getLogger("stripe_reconciler")
+
+# Configure on import, because nothing else does. Without this the logger
+# inherits the root logger's default WARNING level, so every INFO transition
+# line is dropped and the service looks instrumented while emitting nothing.
+# Tests did not catch it: caplog sets a level on the logger it captures, so the
+# suite passed against a logger that was silent under uvicorn. The stage 04a
+# manual check against `stripe listen` is what surfaced it.
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _handler = logging.StreamHandler(sys.stdout)
+    _handler.setFormatter(logging.Formatter("%(message)s"))
+    logger.addHandler(_handler)
 
 
 def log_state_transition(

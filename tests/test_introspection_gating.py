@@ -11,35 +11,45 @@ import pytest
 from fastapi.testclient import TestClient
 
 
-def _client_with_testing(monkeypatch, value):
-    """Rebuild the app with TESTING set, since routes are registered at import."""
+def _client_with_testing(monkeypatch, value, tmp_path):
+    """Rebuild the app with TESTING set, since routes are registered at import.
+
+    The endpoint reads the database from stage 04a onward, so it gets a real
+    but empty one. The gate being tested is whether the route exists at all,
+    which is unrelated to what it would find.
+    """
     if value is None:
         monkeypatch.delenv("TESTING", raising=False)
     else:
         monkeypatch.setenv("TESTING", value)
 
     import service.config
+    import service.db
     import service.main
 
     importlib.reload(service.config)
     importlib.reload(service.main)
+
+    monkeypatch.setattr(service.config, "DATABASE_PATH", str(tmp_path / "gating.db"))
+    service.db.init_db()
+
     return TestClient(service.main.app)
 
 
-def test_introspection_404s_when_testing_unset(monkeypatch):
-    client = _client_with_testing(monkeypatch, None)
+def test_introspection_404s_when_testing_unset(monkeypatch, tmp_path):
+    client = _client_with_testing(monkeypatch, None, tmp_path)
     assert client.get("/test/payments/1").status_code == 404
 
 
 @pytest.mark.parametrize("value", ["false", "False", "0", ""])
-def test_introspection_404s_when_testing_is_not_true(monkeypatch, value):
+def test_introspection_404s_when_testing_is_not_true(monkeypatch, tmp_path, value):
     """Anything other than a clear yes must leave the endpoint closed."""
-    client = _client_with_testing(monkeypatch, value)
+    client = _client_with_testing(monkeypatch, value, tmp_path)
     assert client.get("/test/payments/1").status_code == 404
 
 
-def test_introspection_available_when_testing_true(monkeypatch):
-    client = _client_with_testing(monkeypatch, "true")
+def test_introspection_available_when_testing_true(monkeypatch, tmp_path):
+    client = _client_with_testing(monkeypatch, "true", tmp_path)
     # 404 here would mean the route is missing; the unknown id yields 404 too,
     # so assert on a known-absent payment returning the *route's* 404 body.
     response = client.get("/test/payments/does-not-exist")

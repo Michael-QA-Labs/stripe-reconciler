@@ -1,8 +1,9 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+import stripe
+from fastapi import FastAPI, HTTPException, Request
 
-from service import config, db
+from service import config, db, webhook
 
 
 @asynccontextmanager
@@ -31,8 +32,27 @@ def create_payment():
 
 
 @app.post("/webhook")
-def receive_webhook():
-    raise HTTPException(status_code=501, detail="not implemented until stage 04a")
+async def receive_webhook(request: Request):
+    """Verify, then apply. Anything we handled answers 200.
+
+    The body must be the raw bytes. A re-serialized payload is a different byte
+    string and fails verification, so this reads request.body() rather than a
+    parsed model.
+
+    Only a signature failure is an error status. Duplicates, stale events,
+    unknown types and payments we cannot resolve all answer 200, because Stripe
+    retries non-2xx responses and a retry storm is the very thing this service
+    exists to handle. Manufacturing our own would be self-inflicted.
+    """
+    payload = await request.body()
+
+    try:
+        event = webhook.verify(payload, request.headers.get("Stripe-Signature", ""))
+    except stripe.SignatureVerificationError:
+        raise HTTPException(status_code=400, detail="signature verification failed")
+
+    webhook.handle(event)
+    return {"received": True}
 
 
 # Registered only under TESTING. The route genuinely does not exist otherwise,
@@ -41,4 +61,31 @@ if config.TESTING:
 
     @app.get("/test/payments/{payment_id}")
     def get_payment(payment_id: str):
-        raise HTTPException(status_code=404, detail="payment not found")
+        """How the suite reads service state, instead of touching the database.
+
+        anomaly_count is here because an illegal transition is recorded rather
+        than applied blindly (D-015), and a test asserting that needs a way to
+        see it that does not reach into the schema.
+        """
+        conn = db.connect()
+        try:
+            row = conn.execute(
+                "SELECT id, state, amount, updated_at FROM payments WHERE id = ?",
+                (payment_id,),
+            ).fetchone()
+            if row is None:
+                raise HTTPException(status_code=404, detail="payment not found")
+
+            anomalies = conn.execute(
+                "SELECT COUNT(*) FROM anomalies WHERE payment_id = ?", (payment_id,)
+            ).fetchone()[0]
+        finally:
+            conn.close()
+
+        return {
+            "id": row["id"],
+            "state": row["state"],
+            "amount": row["amount"],
+            "updated_at": row["updated_at"],
+            "anomaly_count": anomalies,
+        }

@@ -16,9 +16,14 @@ def test_payments_endpoint_exists_and_is_not_implemented():
     assert response.status_code == 501
 
 
-def test_webhook_endpoint_exists_and_is_not_implemented():
+def test_webhook_endpoint_rejects_an_unsigned_request():
+    """Implemented at stage 04a, so it no longer stubs. It refuses instead.
+
+    An unsigned body is the cheapest proof the front door is actually locked.
+    The full signature suite lives in tests/webhook/test_signature.py.
+    """
     response = client.post("/webhook", content=b"{}")
-    assert response.status_code == 501
+    assert response.status_code == 400
 
 
 def test_unknown_route_is_404_not_501():

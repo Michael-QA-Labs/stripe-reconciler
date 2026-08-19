@@ -42,3 +42,18 @@ def test_absorbed_transition_is_still_logged(caplog):
 
     payload = json.loads(caplog.records[0].getMessage())
     assert payload["absorbed"] is True
+
+
+def test_the_transition_logger_actually_emits_without_test_configuration():
+    """Found by the stage 04a manual check, not by any automated test.
+
+    caplog sets a level on the logger it captures, so the existing tests above
+    passed while the logger was silent under uvicorn: nothing configured it, so
+    INFO fell below the root logger's default WARNING and every transition line
+    was dropped. Stage 04b debugs races by reading these lines, so a logger that
+    works only under caplog is worse than none, because it looks wired.
+    """
+    logger = logging.getLogger("stripe_reconciler")
+
+    assert logger.getEffectiveLevel() <= logging.INFO
+    assert logger.handlers or logging.getLogger().handlers
