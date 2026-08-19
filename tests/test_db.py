@@ -80,3 +80,19 @@ def test_idempotency_keys_rejects_duplicate_key(tmp_path):
         conn.close()
 
     assert not duplicate_allowed
+
+
+def test_init_creates_the_anomalies_table(tmp_path):
+    """Illegal transitions are persisted, not just logged (D-015).
+
+    A payment can accumulate more than one, and an on-call engineer needs to
+    query them after a restart, so they get a table rather than a column.
+    """
+    path = tmp_path / "test.db"
+    db.init_db(path)
+
+    conn = db.connect(path)
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(anomalies)")}
+    conn.close()
+
+    assert {"event_id", "payment_id", "from_state", "to_state", "detected_at"} <= columns

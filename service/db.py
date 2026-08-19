@@ -30,6 +30,18 @@ CREATE TABLE IF NOT EXISTS processed_events (
 
 -- Idempotency-Key handling for POST /payments. The primary key is what makes
 -- the concurrent case correct rather than merely usually correct.
+-- Illegal transitions, persisted rather than only logged (D-015). The only one
+-- the table defines is leaving `canceled`, which cannot happen legitimately, so
+-- a row here means two payments were conflated, a payload was replayed, or the
+-- receiver has a bug. All three are worth finding after a restart.
+CREATE TABLE IF NOT EXISTS anomalies (
+    event_id     TEXT PRIMARY KEY,
+    payment_id   TEXT NOT NULL,
+    from_state   TEXT NOT NULL,
+    to_state     TEXT NOT NULL,
+    detected_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS idempotency_keys (
     key           TEXT PRIMARY KEY,
     request_hash  TEXT NOT NULL,

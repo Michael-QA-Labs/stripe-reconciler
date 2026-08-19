@@ -1,8 +1,20 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException
 
-from service import config
+from service import config, db
 
-app = FastAPI(title="stripe-reconciler")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Every boot, not once by hand. Render wipes the filesystem on each
+    # spin-down and redeploy (D-005), and CREATE TABLE IF NOT EXISTS makes
+    # running this on every start free.
+    db.init_db()
+    yield
+
+
+app = FastAPI(title="stripe-reconciler", lifespan=lifespan)
 
 
 @app.get("/health")
