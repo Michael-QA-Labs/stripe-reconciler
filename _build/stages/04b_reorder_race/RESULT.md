@@ -84,6 +84,12 @@ local receiver" unmet. Conventions require a bug to ship with its regression
 test in the same commit, and case 4 is that test: it is meaningless against the
 serialized handler.
 
+**Reviewed and kept, 2026-08-20.** The change stands. The process did not:
+exceeding a contract's declared outputs is a conversation to have at the moment
+the blocker is found, not something to flag in the writeup afterwards. Stage 07
+legitimately owns `service/main.py` for CI and deploy, so that is where this
+file's changes belong from here.
+
 ## The human check, and what it found
 
 Deleting the precedence check in `service/state_machine.py`:
