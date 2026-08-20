@@ -169,12 +169,12 @@ merely aging badly.
   decision on where a committed binary should live, since the convention above
   says a committed asset is named or asked about rather than assumed.
 
-## Open questions for stage 06
+## Closed here, and open questions for stage 06
 
-1. **The human check is not fully discharged.** The headed run passed and was
-   recorded, but "watch it once end to end and confirm the browser genuinely
-   reaches Stripe's hosted page" is a human act. The recordings are available;
-   the confirmation is Michael's.
+1. **The human check is discharged.** Michael watched the headed run end to
+   end on 2026-08-20 and confirmed it working: the browser reaches Stripe's
+   own hosted page rather than a local form, and the success assertion happens
+   after the redirect back. Every gate this stage carries is now closed.
 2. **`checkout.session.expired` is still not registered** on the destination,
    10 of 11 modelled events. It fires only when a session is abandoned for
    24 hours, so neither browser test can produce one. It remains the only
