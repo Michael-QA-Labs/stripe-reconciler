@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import stripe
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
@@ -34,9 +34,71 @@ def health():
 # The two endpoints that carry the real logic exist from day one, and say
 # plainly that they do nothing yet. A stub returning 200 is a stub a later
 # suite can pass against without noticing.
+def _create_checkout_session(amount: int, currency: str, base_url: str):
+    """Create a hosted Checkout Session for the demo page.
+
+    Every parameter here was confirmed by a real call against the sandbox on the
+    pinned API version, not taken from memory or from the SDK's type hints:
+    stripe 15.5.0 does not ship introspectable param classes for this resource,
+    and the CLI's local help covers only 19 common flags, which include neither
+    line_items nor cancel_url.
+
+    The client is constructed per call rather than at import. The secret key is
+    absent in ordinary unit runs, and building a client at module scope would
+    fail collection for the whole repo rather than just the paths that need it.
+
+    The v1 namespace is deliberate. StripeClient.checkout is deprecated and
+    emits a DeprecationWarning, and pyproject turns warnings into errors, so the
+    old spelling fails the suite rather than merely aging badly.
+    """
+    client = stripe.StripeClient(
+        config.STRIPE_SECRET_KEY, stripe_version=config.STRIPE_API_VERSION
+    )
+    return client.v1.checkout.sessions.create(
+        params={
+            "mode": "payment",
+            "line_items": [
+                {
+                    "price_data": {
+                        "currency": currency,
+                        "product_data": {"name": "Reconciler test payment"},
+                        "unit_amount": amount,
+                    },
+                    "quantity": 1,
+                }
+            ],
+            # Absolute and derived from the incoming request, so the same code
+            # works against localhost and the deployment without a setting.
+            "success_url": f"{base_url}/app/success.html",
+            "cancel_url": f"{base_url}/app/cancel.html",
+        }
+    )
+
+
 @app.post("/payments")
-def create_payment():
-    raise HTTPException(status_code=501, detail="not implemented until stage 06")
+async def create_payment(request: Request, body: dict | None = Body(default=None)):
+    """Two branches, one of which is still honestly unbuilt.
+
+    The Checkout branch is stage 05's. Direct PaymentIntent creation is stage
+    06's, along with Idempotency-Key handling, and it still answers 501 rather
+    than pretending: a stub that returns success is one a later suite passes
+    against without noticing.
+
+    A Session carries no PaymentIntent when it is created. The id appears only
+    once the customer begins paying, which is why session events are resolved to
+    the intent they reference (D-006) rather than assumed to carry one, and why
+    the handler treats a session without an intent as a real case.
+    """
+    if (body or {}).get("mode") != "checkout":
+        raise HTTPException(status_code=501, detail="not implemented until stage 06")
+
+    session = await run_in_threadpool(
+        _create_checkout_session,
+        body.get("amount", 2000),
+        body.get("currency", "usd"),
+        str(request.base_url).rstrip("/"),
+    )
+    return {"id": session.id, "url": session.url}
 
 
 @app.post("/webhook")

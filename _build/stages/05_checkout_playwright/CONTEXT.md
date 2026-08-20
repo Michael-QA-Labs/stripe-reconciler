@@ -52,12 +52,21 @@ signature suite. This stage does not modify the state machine.
 ## Verify
 
 ```
-pytest tests/browser --headed
-pytest tests/browser                 # must also pass headless, since CI is headless
+pytest tests/browser -m live --headed
+pytest tests/browser -m live         # must also pass headless, since CI is headless
 ```
 
 Both, and both pasted into `RESULT.md`. Passing headed but not headless is a
 common and expensive surprise to hit in stage 07.
+
+**`-m live` is not optional here, and the original commands omitted it.** These
+tests drive real hosted Checkout, so conventions make them `live`, and
+`pyproject.toml` deselects that marker by default. Without the flag the command
+collects nothing and reports success having run no tests, which is the worst
+available outcome: a green stage that proved nothing. The alternative, leaving
+them unmarked so the bare command works, would make every default run and every
+CI job drive a real browser against real Stripe, breaking the promise that a
+plain `pytest` needs no network and no key.
 
 ## Human check
 
