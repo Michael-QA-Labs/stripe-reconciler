@@ -5,8 +5,9 @@ state only; anything reconstructable from the repo or git history is left out.
 
 ## Where the pipeline stands
 
-Five of nine stages closed. Current stage is **`04b_reorder_race`** — the four
-ordering cases, the ones the README's headline claim depends on.
+Six of nine stages closed. Current stage is **`05_checkout_playwright`**. 04b
+closed on 2026-08-19: the four ordering cases pass, and the headline claim is
+tested rather than asserted.
 
 | # | Stage | Status |
 |---|---|---|
@@ -15,12 +16,12 @@ ordering cases, the ones the README's headline claim depends on.
 | 02 | `02_transition_table` | closed |
 | 03 | `03_lifecycle_suite` | closed |
 | 04a | `04a_receiver_signatures` | closed (`bdff68a`) |
-| 04b | `04b_reorder_race` | **current** |
-| 05 | `05_checkout_playwright` | open |
+| 04b | `04b_reorder_race` | closed |
+| 05 | `05_checkout_playwright` | **current** |
 | 06 | `06_idempotency` | open |
 | 07 | `07_ci_deploy_readme` | open |
 
-Suite at close of 04a: **56 passed, 5 deselected** (`.venv/bin/pytest -q`).
+Suite at close of 04b: **73 passed, 5 deselected** (`.venv/bin/pytest -q`).
 Live tests are opt-in via `-m live`; the default `addopts` deselects them.
 
 Pipeline rule, unchanged: nothing advances until a person has read the previous
@@ -157,9 +158,11 @@ than a constructed test. Pasted verbatim in `04a/RESULT.md`.
 
 ## Open questions carried into 04b and beyond
 
-1. **Concurrency is designed for but unproven.** `BEGIN IMMEDIATE` and WAL are
-   in place; nothing has yet fired concurrent deliveries at a single payment.
-   That is 04b's job, and where the design fails if it is going to.
+1. **Concurrency was designed for but unproven, and it did fail.** 04b found
+   that `POST /webhook` was an `async def` calling blocking `handle()` on the
+   event loop, so deliveries were serialized: 1 in flight out of 8 fired at
+   once. `BEGIN IMMEDIATE` and WAL had never been exercised. Fixed with
+   `run_in_threadpool`, re-measured at 8 of 8. See `04b/RESULT.md`.
 2. **`pytest-xdist` is not installed.** Serial execution is accidental rather
    than configured. When it is added, `-m live` needs `-n0` — the sandbox caps
    at 25 req/s and 1000 updates per PaymentIntent per hour.

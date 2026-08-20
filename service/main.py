@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 import stripe
 from fastapi import FastAPI, HTTPException, Request
+from starlette.concurrency import run_in_threadpool
 
 from service import config, db, webhook
 
@@ -51,7 +52,16 @@ async def receive_webhook(request: Request):
     except stripe.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="signature verification failed")
 
-    webhook.handle(event)
+    # handle() is synchronous and does blocking SQLite work. Calling it
+    # directly from this async endpoint ran it on the event loop, which
+    # serialized every delivery: stage 04b measured 1 request in flight out of
+    # 8 fired at once. That is head of line blocking, so a slow write delays
+    # every other request including /health, and Stripe retries responses it
+    # considers slow. Retries are duplicate deliveries, which is the failure
+    # this service exists to absorb rather than to manufacture. Handing the
+    # blocking call to the threadpool is what makes concurrent deliveries
+    # actually concurrent, and what puts BEGIN IMMEDIATE and WAL to work.
+    await run_in_threadpool(webhook.handle, event)
     return {"received": True}
 
 
