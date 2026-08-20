@@ -245,3 +245,32 @@ Three constraints this protects, each of which is expensive to undo:
   offline; one `@pytest.mark.live` test proves the real client separately.
 
 The seam is the point: turning refetching on later becomes wiring, not redesign.
+
+
+## D-016: 04b runs over the context band rather than being restructured
+**Stage** 04b | **Date** 2026-08-19
+
+The ICM validator reports 04b at roughly 9.7k tokens of context (entry file plus
+contract plus resolved inputs) against a healthy band of 2k to 8k, and 04a at
+roughly 11.6k. Both were invisible until the validator's stage-name pattern was
+widened to match the letter-suffixed folders `D-002` created, so neither figure
+had ever been weighed.
+
+Run 04b as it stands. No split, no L3 extraction.
+
+- The band is a report line, not an error. `icm-tools` is explicit that a clean
+  run says the workspace is well formed, not that it is the right shape, and
+  that the 2k to 8k claim exists partly to be tested against real workspaces
+  rather than repeated.
+- Every input 04b lists is genuinely used. The weight is `transition-table.md`
+  as the oracle and `signing.py` for constructing payloads, and the stage cannot
+  do its job without either.
+- Restructuring the stage that carries the README's headline claim, immediately
+  before running it, to satisfy a soft heuristic is the more expensive mistake.
+  `D-002` already split this work once for a reason that was concrete.
+
+Tripwire, not a reversal: if 04b degrades in a way that looks context-driven, an
+agent losing the precedence rule or the oracle partway through the stage, this
+is the first thing to revisit, and pushing `docs/transition-table.md` into an L3
+file the contract points at is the move. Cheap to do later, because the contract
+already routes the path rather than inlining the content.

@@ -12,7 +12,7 @@ Timebox: 2 to 4 focused days.
 - Working (from stage 04a): ../../../tests/helpers/signing.py
 - Working (the oracle, from stage 02): ../../../docs/transition-table.md
 - Reference (every run): ../../_shared/conventions.md
-- Reference (read D-007): ../../DECISIONS.md
+- Reference (read D-007, D-014 and D-015): ../../DECISIONS.md
 
 Do NOT load: `../../_shared/scope-original.md`, anything Playwright, anything
 about fixtures. **No captured fixture files in v1.** The signing secret is known

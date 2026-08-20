@@ -40,6 +40,9 @@ Stable across every stage. Load this with any stage that writes code.
   README. Use commas, colons, parentheses, or a full stop.
 - Docs state what is true now. Aspirations go in `DECISIONS.md` or the v2 plan,
   not in present tense.
+- A file that cites a decision by number (`D-014`) must list `DECISIONS.md` in
+  its Inputs. A cited decision with no route to it cannot be read from inside
+  the stage, and the citation reads as satisfied when it is not.
 
 ## Code
 

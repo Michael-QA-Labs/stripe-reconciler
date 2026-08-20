@@ -12,6 +12,7 @@ Timebox: 2 to 4 focused days.
 - Working (this run): ../04b_reorder_race/RESULT.md
 - Reference (every run): ../../_shared/conventions.md
 - Reference (test cards): ../../_shared/stripe-facts.md
+- Reference (read D-006, session to PaymentIntent mapping): ../../DECISIONS.md
 
 Do NOT load: `../../_shared/scope-original.md`, the ordering suite, the
 signature suite. This stage does not modify the state machine.
