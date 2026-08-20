@@ -219,6 +219,19 @@ def poll_state(base_url: str, payment_id: str, timeout: float = WEBHOOK_TIMEOUT_
     )
 
 
+def assert_no_record(base_url: str, identifier: str) -> None:
+    """The receiver must hold nothing under this id."""
+    try:
+        with urllib.request.urlopen(
+            f"{base_url}/test/payments/{identifier}", timeout=5
+        ) as response:
+            raise AssertionError(
+                f"a record exists for {identifier}: {json.load(response)}"
+            )
+    except urllib.error.HTTPError as error:
+        assert error.code == 404, f"expected 404 for {identifier}, got {error.code}"
+
+
 def intent_id_for(stripe_client, session_id: str) -> str:
     """A Session carries no PaymentIntent until the customer starts paying.
 
@@ -244,7 +257,11 @@ def test_a_paid_card_is_recorded_as_succeeded_by_the_webhook(page, receiver, str
     pay_with(page, SUCCESS_CARD)
 
     page.wait_for_url("**/app/success.html", timeout=RENDER_TIMEOUT_MS)
-    assert page.get_by_text("Payment complete").is_visible()
+    # wait_for, not is_visible: the URL changes before the document renders, and
+    # is_visible is a point in time check rather than a wait. It passed here on
+    # timing luck and failed on the cancel page, which is the same bug the
+    # contract warns about for the webhook poll.
+    page.get_by_text("Payment complete").wait_for(state="visible", timeout=RENDER_TIMEOUT_MS)
 
     payment = poll_state(receiver, intent_id_for(stripe_client, session["id"]))
     assert payment["state"] == "succeeded"
@@ -276,3 +293,45 @@ def test_a_declined_card_surfaces_the_error_and_never_reaches_a_paid_state(
     payment = poll_state(receiver, intent_id_for(stripe_client, session["id"]))
     assert payment["state"] == "requires_payment_method"
     assert payment["state"] not in PAID_STATES
+
+
+def test_abandoning_checkout_records_nothing_at_all(page, receiver, stripe_client):
+    """The one case where asserting absence is correct, and why.
+
+    The decline case cannot assert that no record exists, because a declined
+    card still has a PaymentIntent behind it. Abandoning the session is
+    different in kind: the customer leaves before paying, so Stripe never
+    creates an intent, no event is delivered, and there is nothing to record.
+
+    The second assertion is the interesting one. A payment is keyed on the
+    PaymentIntent because that is the canonical record (D-006), and session
+    events are resolved to the intent they reference rather than stored under
+    their own id. Querying the receiver by session id proves it did not create
+    a phantom payment keyed on the wrong object, which is the failure that
+    resolution exists to prevent and which nothing else here would catch.
+    """
+    session = start_checkout(receiver)
+    page.goto(session["url"], wait_until="load")
+
+    # Wait for the page to actually finish rendering before leaving it. The
+    # back link is visible in the skeleton, seconds before the rest exists, and
+    # clicking it then is not what a customer abandoning a payment does. The
+    # card radio is the marker for a rendered page, as in the tests above.
+    page.get_by_role("radio", name="Card").wait_for(
+        state="visible", timeout=RENDER_TIMEOUT_MS
+    )
+
+    # Matched on the prefix: the full accessible name carries the account's
+    # display name, which is not ours to depend on.
+    back = page.get_by_role("link", name="Back to")
+    back.wait_for(state="visible", timeout=RENDER_TIMEOUT_MS)
+    back.click()
+
+    page.wait_for_url("**/app/cancel.html", timeout=RENDER_TIMEOUT_MS)
+    page.get_by_text("Not completed").wait_for(state="visible", timeout=RENDER_TIMEOUT_MS)
+
+    abandoned = stripe_client.v1.checkout.sessions.retrieve(session["id"])
+    assert abandoned.payment_status == "unpaid"
+    assert abandoned.payment_intent is None, "an abandoned session created an intent"
+
+    assert_no_record(receiver, session["id"])

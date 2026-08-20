@@ -13,7 +13,7 @@ recorded below because it is the more useful result.
 |---|---|
 | `web/` | three pages plus a shared stylesheet, served at `/app` |
 | `service/main.py` | Checkout Session branch on `POST /payments`, `StaticFiles` mount |
-| `tests/browser/test_checkout.py` | two tests, marked `live`, spawning their own receiver and listener |
+| `tests/browser/test_checkout.py` | three tests, marked `live`, spawning their own receiver and listener |
 | `requirements.txt` | `playwright==1.62.0`, `pytest-playwright==0.9.0`, exact pins |
 | Suite | 75 passing by default, 7 live deselected (5 lifecycle, 2 browser) |
 
@@ -38,10 +38,10 @@ Three things settled here that stage 06 and 07 lean on:
 
 ```
 $ .venv/bin/pytest tests/browser -m live --headed --video=on
-2 passed in 29.98s
+3 passed in 25.88s
 
 $ .venv/bin/pytest tests/browser -m live
-2 passed in 22.61s
+3 passed in 23.77s
 
 $ .venv/bin/pytest -q
 75 passed, 7 deselected in 0.42s
@@ -152,17 +152,22 @@ merely aging badly.
 
 ## Deviations from the contract, stated rather than buried
 
-- **Two tests, not the three to five the contract specifies.** The contract
-  names exactly two scenarios, success and decline, and also says this is the
-  flakiest surface in the repo and is scoped to stay small. Padding to three
-  would have meant inventing a scenario or splitting one assertion across two
-  tests that share a payment. Two honest tests beat three arranged ones.
-- **`web/` contains a fourth file**, `_style.css`, shared by the three declared
-  pages. The outputs list names only the HTML.
-- **No GIF was recorded.** `--video=on` produced webm recordings of both runs,
-  but converting to GIF needs `ffmpeg`, which is not installed. Installing a
-  system tool is outside this stage, so the recordings are kept and the
-  conversion is stage 07's to do when the README needs it.
+- **A third scenario was added rather than padding to the contract's count.**
+  The contract names two scenarios and asks for three to five tests. The gap
+  was closed with abandonment, not by splitting an assertion across two tests
+  sharing a payment, which would make them order dependent and turn one defect
+  into two red tests. Abandonment earns its place: it is the one case where
+  asserting that **no record exists** is correct, because the customer leaves
+  before paying and Stripe never creates an intent. It is the assertion the
+  contract originally wanted, applied to the case where it holds.
+- **`web/_style.css` is no longer a deviation.** `conventions.md` now states
+  that an Outputs list names principal artifacts and that a supporting file
+  serving one of them is implied, while anything else is not. The stylesheet
+  serves the three named pages.
+- **The GIF exists.** 900 by 506, 17 seconds, 552KB, built from the headed
+  recording with `ffmpeg` and `gifski`. It is held outside the repo pending a
+  decision on where a committed binary should live, since the convention above
+  says a committed asset is named or asked about rather than assumed.
 
 ## Open questions for stage 06
 

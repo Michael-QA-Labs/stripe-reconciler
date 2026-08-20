@@ -43,6 +43,12 @@ Stable across every stage. Load this with any stage that writes code.
 - A file that cites a decision by number (`D-014`) must list `DECISIONS.md` in
   its Inputs. A cited decision with no route to it cannot be read from inside
   the stage, and the citation reads as satisfied when it is not.
+- A stage's **Outputs** list names principal artifacts. A supporting file that
+  exists only to serve one of them, a stylesheet for a named page or a helper
+  beside a named suite, is implied and does not need listing. Anything that is
+  not merely serving a named artifact is never implied: a new module, endpoint,
+  dependency, or committed asset gets named in the contract or asked about
+  before it is added.
 
 ## Code
 
