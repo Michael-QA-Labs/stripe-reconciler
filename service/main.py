@@ -1,10 +1,17 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import stripe
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
 from service import config, db, webhook
+
+# Resolved from this file rather than the working directory. Render's start
+# command and a local uvicorn run do not share a CWD, and a relative path here
+# fails only at runtime, on the deployment, where it is expensive to notice.
+WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 
 
 @asynccontextmanager
@@ -99,3 +106,11 @@ if config.TESTING:
             "updated_at": row["updated_at"],
             "anomaly_count": anomalies,
         }
+
+
+# Mounted at /app rather than /. A mount at the root is a catch all: it answers
+# every unmatched path, which turns the honest 501 and 404 responses above into
+# whatever the static handler feels like returning, and
+# test_unknown_route_is_404_not_501 exists to refuse exactly that. Same origin
+# either way, so the page can POST to /payments with no CORS handling.
+app.mount("/app", StaticFiles(directory=WEB_DIR, html=True), name="web")

@@ -1,0 +1,84 @@
+/* Shared by the three demo pages. Minimal on purpose: this stage's job is the
+   browser flow, not the front end. */
+:root {
+  color-scheme: light dark;
+  --ground: #f4f6f5;
+  --card: #ffffff;
+  --ink: #14201e;
+  --muted: #5b6e6a;
+  --rule: #d7e0dc;
+  --accent: #0f6e5c;
+  --alert: #8c3b2e;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #0d1513;
+    --card: #151f1d;
+    --ink: #e4ebe8;
+    --muted: #8da09b;
+    --rule: #24322e;
+    --accent: #52c0a4;
+    --alert: #d97a66;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: var(--ground);
+  color: var(--ink);
+  font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main {
+  width: 100%;
+  max-width: 26rem;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 2rem;
+}
+h1 { margin: 0 0 .4rem; font-size: 1.4rem; letter-spacing: -.01em; }
+p { margin: 0 0 1.25rem; color: var(--muted); }
+p:last-child { margin-bottom: 0; }
+.amount {
+  font: 500 2.2rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: -.02em;
+  margin: 0 0 1.5rem;
+  color: var(--ink);
+}
+button {
+  width: 100%;
+  padding: .8rem 1rem;
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) { filter: brightness(1.08); }
+button:disabled { opacity: .6; cursor: progress; }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.status {
+  margin-top: 1rem;
+  font-size: .9rem;
+  color: var(--alert);
+  min-height: 1.4em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.badge {
+  display: inline-block;
+  font: 500 .72rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: .4em .6em;
+  border-radius: 3px;
+  margin-bottom: 1rem;
+}
+.badge.ok { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.badge.off { color: var(--muted); background: color-mix(in srgb, var(--muted) 14%, transparent); }
+a { color: var(--accent); }
