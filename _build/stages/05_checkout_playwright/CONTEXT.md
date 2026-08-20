@@ -30,8 +30,24 @@ signature suite. This stage does not modify the state machine.
      causes an async webhook; the assertion happens over HTTP against our own
      service. Do not assert on the Stripe success page alone, which would prove
      only that Stripe works.
-   - **Decline**: `4000 0000 0000 0002`. The error surfaces to the user **and no
-     payment record is created**. The second half is the assertion that matters.
+   - **Decline**: `4000 0000 0000 0002`. The error surfaces to the user **and
+     the payment never reaches a paid state**.
+
+     **Corrected 2026-08-20, having been observed.** This step originally read
+     "and no payment record is created", calling that the assertion that
+     matters. It cannot be written, because it is false. A declined card still
+     has a PaymentIntent behind it, and Stripe delivers `charge.failed`,
+     `payment_intent.created`, and `payment_intent.payment_failed`. All three
+     are registered and modelled, and the last two claim
+     `requires_payment_method`, so a record is created and rank 10 is the
+     correct state for it.
+
+     The intent behind the original wording is right: a decline must not look
+     like a payment. The assertion that expresses it is a claim about state,
+     not about absence. Assert the record sits at `requires_payment_method` and
+     never reaches `processing`, `succeeded`, or `refunded`. Asserting absence
+     would have failed on the first honest run and invited someone to weaken
+     the receiver to make it pass.
 4. Constraints, all deliberate:
    - **Role and label locators only.** No CSS or XPath. Stripe redesigns hosted
      Checkout without notice, and role locators are what survive it.
@@ -55,6 +71,9 @@ signature suite. This stage does not modify the state machine.
 pytest tests/browser -m live --headed
 pytest tests/browser -m live         # must also pass headless, since CI is headless
 ```
+
+Add `--tracing=retain-on-failure --video=retain-on-failure` for step 4's trace
+and video. They are flags rather than config so an ordinary run writes nothing.
 
 Both, and both pasted into `RESULT.md`. Passing headed but not headless is a
 common and expensive surprise to hit in stage 07.
