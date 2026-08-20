@@ -140,6 +140,26 @@ def handle(event, fetch_payment_intent: Callable | None = None) -> None:
                 " updated_at = datetime('now') WHERE id = ?",
                 (transition.state_after, amount, payment_id),
             )
+        elif amount is not None:
+            # An absorbed event changes no state, but it can still carry a fact
+            # the record does not have yet. Only a PaymentIntent payload states
+            # the intent's amount, and charge.refunded claims the top rank, so a
+            # payment whose first event is a refund is created with a NULL
+            # amount that nothing can ever fill: every later PaymentIntent event
+            # is absorbed on rank and used to skip this write. That case is not
+            # exotic, because the filesystem is ephemeral (D-005) and the
+            # database is empty after every redeploy, which makes a refund on an
+            # older payment a first sighting.
+            #
+            # IS NULL is what keeps this safe rather than merely useful: a known
+            # amount is never overwritten, so a stale or partial figure cannot
+            # replace a good one. updated_at is deliberately left alone, because
+            # no state changed and an absorbed event must not look like a
+            # transition (D-017).
+            conn.execute(
+                "UPDATE payments SET amount = ? WHERE id = ? AND amount IS NULL",
+                (amount, payment_id),
+            )
 
         if not transition.legal:
             conn.execute(

@@ -274,3 +274,58 @@ agent losing the precedence rule or the oracle partway through the stage, this
 is the first thing to revisit, and pushing `docs/transition-table.md` into an L3
 file the contract points at is the move. Cheap to do later, because the contract
 already routes the path rather than inlining the content.
+
+
+## D-017: An absorbed event fills a missing amount, and never replaces one
+**Stage** 04b | **Date** 2026-08-19
+
+Found closing 04b. Only a PaymentIntent payload is trusted for the intent's
+amount, because a Charge's amount can differ on a partial refund. And the
+amount is written only on a path that is not absorbed. Both rules are right on
+their own, and together they leave a hole.
+
+`charge.refunded` carries a Charge, so it supplies no amount, and it claims
+`refunded`, the top rank. A payment whose first event is a refund is therefore
+created with a NULL amount that nothing can ever fill: every later
+PaymentIntent event is absorbed on rank and skips the write. Measured before
+the fix, the same two events in the two orders:
+
+```
+refunded then succeeded:  state=refunded  amount=None
+succeeded then refunded:  state=refunded  amount=2000
+```
+
+This is not exotic. The filesystem is ephemeral (`D-005`) and the schema is
+recreated on every boot, so the database is empty after each redeploy and a
+refund on an older payment arrives as a first sighting.
+
+It also matters to how the project describes itself. State is order
+independent, and that claim holds. The *record* was not, and a reader hearing
+"delivery order cannot change the outcome" would reasonably assume otherwise.
+Stage 07 should phrase the README's claim as being about state.
+
+Three options were weighed:
+
+- **Leave it, and let the v2 refetch supply the amount.** Honest about
+  provenance, since the amount genuinely is not in the payload received, and
+  `D-015` already defers refetching to v2. Rejected because v1 is the demo, and
+  a reconciler that cannot state an amount is not reconciling.
+- **Treat the Charge's amount as a fallback.** Removes every NULL. Rejected
+  outright: a partial refund's Charge amount is not the intent's, and the table
+  already says partial refunds collapse. It would record a number that looks
+  authoritative and is wrong, which is worse than recording nothing.
+- **Fill only what is missing.** Chosen. An absorbed event carrying an amount
+  writes it under `WHERE amount IS NULL`, so a known figure is never replaced
+  and a stale or partial one cannot displace a good one.
+
+`updated_at` is deliberately not touched by that write. No state changed, and
+an absorbed event must not look like a transition.
+
+Cost is one extra UPDATE on absorbed deliveries, which are the majority. It is
+a single indexed write on the primary key, against a receiver that already
+takes `BEGIN IMMEDIATE` per delivery, so it is not the bottleneck.
+
+Pinned by `test_an_absorbed_event_still_fills_an_amount_the_record_does_not_have`,
+which fails without the fix, and by
+`test_an_absorbed_event_never_overwrites_an_amount_already_known`, which fails
+against the careless version of the same fix that omits the `IS NULL` guard.

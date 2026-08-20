@@ -153,8 +153,14 @@ is in this stage's outputs.
    and highest-ranked event is `charge.refunded` is created with `amount` NULL,
    and every later PaymentIntent event is absorbed on rank, so the amount is
    never recorded. Correct per the table, which says absorbed events are logged
-   and discarded, but it means `amount` is not reliably populated. Not fixed
-   here: it is a persistence question, not an ordering one.
+   and discarded, but it means `amount` is not reliably populated.
+
+   **Resolved 2026-08-19 as `D-017`**, just after this stage closed. Fixed in
+   the webhook write path rather than deferred: stage 06's job is
+   `POST /payments` and the `idempotency_keys` table, so it never touches this
+   code, and parking the bug there would have hidden it behind two unrelated
+   stages. An absorbed event now fills a missing amount under
+   `WHERE amount IS NULL`, so a known figure is never replaced.
 2. **Concurrency is proven for SQLite on one process.** Render runs one
    instance, so this matches production today. Two instances against one SQLite
    file would not be covered by anything here, and `D-005` already says the

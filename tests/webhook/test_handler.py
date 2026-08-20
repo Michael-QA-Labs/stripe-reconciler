@@ -114,3 +114,28 @@ def test_amount_is_taken_only_from_payment_intent_payloads(client):
     post(client, make_event("evt_1", "payment_intent.succeeded", payment_intent_object(amount=2500)))
 
     assert state_of(client, "pi_1")["amount"] == 2500
+
+
+def test_an_absorbed_event_still_fills_an_amount_the_record_does_not_have(client):
+    """D-017. A refund seen first leaves a NULL amount nothing could ever fill.
+
+    charge.refunded carries a Charge, which is not trusted for the intent's
+    amount, and it claims the top rank. So the payment is created at refunded
+    with no amount, and every later PaymentIntent event is absorbed on rank.
+    Before the fix the amount stayed NULL permanently, which made the record
+    order dependent even though the state was not.
+    """
+    post(client, make_event("evt_1", "charge.refunded", charge_object()))
+    post(client, make_event("evt_2", "payment_intent.succeeded", payment_intent_object(amount=2500)))
+
+    payment = state_of(client, "pi_1")
+    assert payment["state"] == "refunded"
+    assert payment["amount"] == 2500
+
+
+def test_an_absorbed_event_never_overwrites_an_amount_already_known(client):
+    """Fill only what is missing. A later payload must not replace a good figure."""
+    post(client, make_event("evt_1", "payment_intent.succeeded", payment_intent_object(amount=2500)))
+    post(client, make_event("evt_2", "payment_intent.processing", payment_intent_object(amount=9999)))
+
+    assert state_of(client, "pi_1")["amount"] == 2500

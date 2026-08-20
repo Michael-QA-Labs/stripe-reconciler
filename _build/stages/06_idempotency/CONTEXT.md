@@ -12,6 +12,7 @@ Timebox: 2 to 4 focused days.
 - Working (this run): ../05_checkout_playwright/RESULT.md
 - Reference (every run): ../../_shared/conventions.md
 - Reference (the 24-hour TTL): ../../_shared/stripe-facts.md
+- Reference (step 3 records the TTL here): ../../DECISIONS.md
 
 Do NOT load: `../../_shared/scope-original.md`, the browser suite, the ordering
 suite.

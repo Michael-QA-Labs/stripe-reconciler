@@ -21,7 +21,8 @@ tested rather than asserted.
 | 06 | `06_idempotency` | open |
 | 07 | `07_ci_deploy_readme` | open |
 
-Suite at close of 04b: **73 passed, 5 deselected** (`.venv/bin/pytest -q`).
+Suite at close of 04b: **75 passed, 5 deselected** (`.venv/bin/pytest -q`),
+including the two `D-017` regression tests added just after the stage closed.
 Live tests are opt-in via `-m live`; the default `addopts` deselects them.
 
 Pipeline rule, unchanged: nothing advances until a person has read the previous
@@ -78,6 +79,9 @@ in this session:
   code. Scope note: this case catches **our** bugs. The README must not present
   it alongside duplicate, reordered, and late delivery, which are the cases that
   actually happen.
+- **`D-017`** — An absorbed event fills a missing `amount` and never replaces
+  one. Found closing 04b: a refund seen first left a NULL amount nothing could
+  fill, which made the *record* order dependent even though the state was not.
 - **`D-016`** — 04b runs over the context band rather than being restructured.
   Made 2026-08-19, after the validator fix made the figure visible for the first
   time.
