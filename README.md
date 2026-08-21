@@ -29,7 +29,133 @@ that logic explicitly, as a transition table where terminal states absorb and
 state never regresses, and then tests it against duplicate, reordered, and late
 delivery rather than asserting it works.
 
-## Status
+## How a delivery is handled
 
-In progress. The service skeleton, the schema, and the health check exist; the
-sequencing logic and its suites do not yet.
+Every webhook delivery walks the same nine steps. Nothing buffers, nothing
+sleeps waiting for a predecessor, and nothing consults a clock to decide an
+outcome.
+
+```mermaid
+flowchart TD
+    S["Stripe<br/>at-least-once, any order"]
+    S -->|"POST /webhook"| V
+
+    subgraph R ["The receiver"]
+        direction TB
+        V["1. Verify the raw bytes<br/>against both signing secrets"]
+        T["2. Hand the blocking work<br/>to the threadpool"]
+        L["3. BEGIN IMMEDIATE<br/>take the write lock up front"]
+        D{"4. Is this event id<br/>already recorded?"}
+        P["5. Resolve which PaymentIntent<br/>the event concerns"]
+        C{"6. Does the claimed state<br/>outrank the recorded one?"}
+        A["7. Apply it<br/>state moves up"]
+        B["8. Absorb it<br/>state unchanged"]
+        X["9. Flag an anomaly<br/>if it left a terminal state"]
+    end
+
+    V -->|"bad signature"| E["400<br/>the only error this endpoint returns"]
+    V -->|"verified"| T
+    T --> L
+    L --> D
+    D -->|"yes, a duplicate"| DROP["200, rolled back"]
+    D -->|"no, first sighting"| P
+    P --> C
+    C -->|"yes"| A
+    C -->|"no"| B
+    A --> X
+    X --> DB
+    B -->|"fills a missing amount only"| DB
+    DB[("SQLite in WAL mode<br/>payments, processed_events, anomalies")]
+```
+
+**1. Verify the raw bytes.** The body must be the exact bytes Stripe sent, so
+the handler reads `request.body()` rather than a parsed model. A re-serialized
+payload is a different byte string and fails verification. Two signing secrets
+exist and they are not interchangeable, the CLI one for `stripe listen` locally
+and the dashboard one for the deployed endpoint, so each is tried in turn. That
+is what lets the same code serve both without an environment switch.
+
+**2. Hand the blocking work to the threadpool.** This step looks like plumbing
+and is not. The endpoint was originally an `async def` calling synchronous
+SQLite work directly, which ran it on the event loop and serialized every
+delivery. Firing eight at once measured **one request in flight out of eight**.
+That is head of line blocking: one slow write delays everything including
+`/health`, and Stripe retries responses it considers slow. Those retries are
+duplicate deliveries, so the receiver would have been manufacturing the exact
+failure it exists to absorb. After the fix, eight of eight.
+
+**3. Take the write lock up front.** `BEGIN IMMEDIATE` claims the lock now
+rather than on first write, so reading the current state and writing the new one
+cannot interleave with another delivery for the same payment.
+
+**4. Let the primary key arbitrate duplicates.** The handler inserts the event
+id into `processed_events` and catches the constraint violation, rather than
+checking whether it exists and then inserting. Checking first leaves a window
+that is small enough to miss on a quiet machine and wide enough to matter on a
+busy one.
+
+**5. Resolve which payment the event concerns.** This differs by event type and
+getting it wrong is silent. A `payment_intent.*` event carries the intent, so
+the id is the object's own. A `charge.refunded` carries a Charge and a
+`checkout.session.*` carries a Session, and both reference the intent by field.
+Reading `data.object.id` uniformly would store state against a charge id and
+quietly create payments that never existed.
+
+**6. Compare rank, not time.** Every state has a rank, every event claims a
+state, and the claim is applied only if it ranks **strictly** higher than what
+is recorded. This one rule is the whole ordering mechanism. There is no
+timestamp comparison deciding outcomes and no buffer holding events until their
+predecessors arrive.
+
+**7. Apply, when the claim outranks.** The record moves up and `updated_at` is
+set, because a column with a default only gets it on insert.
+
+**8. Absorb, when it does not.** The event is logged and discarded. Because the
+comparison is strictly higher, a duplicate delivery claiming equal rank is a
+no-op for free, without consulting `processed_events` at all. An absorbed event
+can still carry a fact the record lacks: it fills an `amount` that is NULL, and
+never replaces one already known. Without that guard, a payment whose first
+event is a refund is created with an amount nothing can ever fill.
+
+**9. Flag the impossible rather than hide it.** Ranking already refuses every
+backwards move, so the only transitions worth calling illegal are forward ones
+that cannot be real. Stripe states a PaymentIntent cannot be canceled after
+succeeding, which makes `canceled` genuinely terminal. An event that leaves it
+means two payments were conflated, a payload was replayed, or we have a bug. The
+state still updates and the anomaly is recorded alongside it, because collapsing
+those two into one value forces a false choice between refusing evidence that
+money moved and hiding an impossible transition.
+
+Only a bad signature is an error. Duplicates, stale events, unknown types and
+payments that cannot be resolved all answer 200, because Stripe retries anything
+else and a retry storm is the failure this service exists to handle.
+
+## Why delivery order cannot change the state
+
+The rank table is the ordering mechanism, transcribed in
+[`service/state_machine.py`](service/state_machine.py) from
+[`docs/transition-table.md`](docs/transition-table.md), with a test that fails
+if the two ever drift apart.
+
+| Rank | State | Claimed by |
+|---:|---|---|
+| 80 | `refunded` | `charge.refunded` |
+| 70 | `succeeded` | `payment_intent.succeeded` |
+| 60 | `canceled` | `payment_intent.canceled`, `checkout.session.expired` |
+| 50 | `processing` | `payment_intent.processing`, `payment_intent.partially_funded`, `checkout.session.completed` |
+| 40 | `requires_capture` | `payment_intent.amount_capturable_updated` |
+| 30 | `requires_action` | `payment_intent.requires_action` |
+| 20 | `requires_confirmation` | no event claims this one |
+| 10 | `requires_payment_method` | `payment_intent.created`, `payment_intent.payment_failed` |
+
+Because the final state is the highest rank among the events received, it is a
+property of the **set** of events rather than of their sequence. Any permutation
+lands in the same place. That is the claim, and it is tested rather than
+argued: all six permutations of `created`, `processing` and `succeeded` are run
+and asserted to converge.
+
+Two details in that table are worth pausing on. `requires_capture` sits below
+`processing` because manual capture authorizes first and processes second.
+`refunded` is this project's state and not Stripe's, whose PaymentIntent status
+enum has seven values and no refunded among them, because refunds live on the
+Charge. Since the PaymentIntent is the canonical record, a refund lands here.
