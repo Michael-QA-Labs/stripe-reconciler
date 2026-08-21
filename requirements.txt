@@ -1,24 +1,17 @@
-# Python 3.13 (D-001). Install with:
+# Python 3.13 (D-001). Install the service with:
 #   uv venv --python 3.13 && uv pip install -r requirements.txt
+# To run the suite, install requirements-dev.txt instead, which includes this
+# file.
+#
+# This file is the SERVICE only. Render's buildCommand installs it directly, so
+# anything added here ships to the deployed web service. Test and browser
+# tooling lives in requirements-dev.txt for that reason.
+#
 # Exact pins everywhere: CI, Render, and a fresh clone must resolve to the same
 # set, and a silent minor bump in a signature or webhook path is exactly the
 # kind of drift this suite exists to catch.
 
-# Service
 fastapi==0.141.1
 uvicorn[standard]==0.52.3   # standard extras bring uvloop and httptools, which Render's start command uses
 python-dotenv==1.2.3        # .env for local development only; Render and CI inject real environment variables
 stripe==15.5.0              # SDK. API version is pinned separately as a literal in service/config.py
-
-# Tests
-pytest==9.1.1
-pytest-repeat==0.9.4        # stage 06 reruns the idempotency case to prove it is not flaky
-httpx2==2.12.0              # starlette 1.6 TestClient requires httpx2; plain httpx still imports but warns, and pyproject turns warnings into errors
-
-# Browser tests (stage 05). Marked `live`: they drive real hosted Checkout, so
-# they are deselected by default and CI runs them in the live job only. The
-# browser binary is not a pip package: `playwright install chromium` fetches it
-# separately, and CI has to run that step too or collection passes and the
-# launch fails.
-playwright==1.62.0
-pytest-playwright==0.9.0

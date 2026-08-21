@@ -1,0 +1,25 @@
+# Everything the service needs, plus the test and reporting stack. Install with:
+#   uv venv --python 3.13 && uv pip install -r requirements-dev.txt
+#
+# Render never reads this file. Its buildCommand installs requirements.txt
+# alone, which is what keeps playwright and its 40MB browser binary off the
+# deployed service.
+
+-r requirements.txt
+
+# Tests
+pytest==9.1.1
+pytest-repeat==0.9.4        # stage 06 reruns the idempotency case to prove it is not flaky
+httpx2==2.12.0              # starlette 1.6 TestClient requires httpx2; plain httpx still imports but warns, and pyproject turns warnings into errors
+
+# Reporting, added at stage 07 for CI
+allure-pytest==2.16.0       # writes the results the Allure report is built from
+pytest-cov==7.1.0           # coverage, measured in CI rather than claimed in the README
+
+# Browser tests (stage 05). Marked `live`: they drive real hosted Checkout, so
+# they are deselected by default and CI runs them in the live job only. The
+# browser binary is not a pip package: `playwright install chromium` fetches it
+# separately, and CI has to run that step too or collection passes and the
+# launch fails.
+playwright==1.62.0
+pytest-playwright==0.9.0
