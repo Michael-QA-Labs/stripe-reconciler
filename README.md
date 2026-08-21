@@ -243,9 +243,11 @@ Stripe suite in one report: 87 tests, with the trend carried across runs rather
 than rebuilt from scratch each time. Every test carries its own reasoning, so
 the report is readable as an argument rather than only as a pass count.
 
-Coverage of `service/` sits at 97 percent, measured by the same run that
-publishes the report. The badge above reads from a JSON endpoint written beside
-it, so the number cannot drift from the run that produced it.
+Coverage of `service/` is measured by the run that publishes the report, and the
+badge above reads from a JSON endpoint written beside it. The badge is the
+number; it is deliberately not repeated in prose here, because a figure typed
+into a sentence goes stale the first time the suite changes and nothing fails
+when it does.
 
 What is deliberately not claimed here is a mutation score. Coverage says a line
 executed, not that anything would notice if it broke. Every stage of this build
@@ -274,7 +276,8 @@ The reasoning, job by job:
   sequencing rule, the dedupe, and the idempotency store are ours, so a
   regression in them is a real defect. It needs no network and no secret, which
   is what makes it safe to run on a fork PR and fast enough to run on every
-  push. Coverage of `service/` currently sits at 97 percent from this job alone.
+  push. The coverage badge at the top of this README is measured from this job
+  alone.
 - **`live` blocks but runs serially, and never as a matrix.** It is the only
   thing that would notice if the real Stripe client broke, because everything
   else substitutes it. It is skipped on fork PRs because Actions withholds
