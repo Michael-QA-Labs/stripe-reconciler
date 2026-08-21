@@ -1,4 +1,4 @@
-# 04a_receiver_signatures — RESULT
+# 04a_receiver_signatures: RESULT
 
 **Completed** 2026-08-19. Stage 04b is now current.
 

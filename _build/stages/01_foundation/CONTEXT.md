@@ -1,4 +1,4 @@
-# 01_foundation — service skeleton, deployed
+# 01_foundation: service skeleton, deployed
 
 One job: a FastAPI service with all four endpoints scaffolded, a SQLite database
 in WAL mode, and a **live URL**. Deploying now rather than at stage 07 is `D-003`.

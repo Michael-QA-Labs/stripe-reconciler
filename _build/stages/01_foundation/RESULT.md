@@ -1,4 +1,4 @@
-# 01_foundation — RESULT
+# 01_foundation: RESULT
 
 **Completed** 2026-08-18. Stage 02 is now current.
 

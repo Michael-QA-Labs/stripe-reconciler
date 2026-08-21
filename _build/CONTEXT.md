@@ -62,12 +62,12 @@ Recorded once, here, so nobody has to diff this against
 
 Every `stages/*/CONTEXT.md` carries four sections:
 
-- **Inputs** — exact paths, split into working (from the previous stage) and
+- **Inputs**: exact paths, split into working (from the previous stage) and
   reference (every run), plus an explicit *Do NOT load* line.
-- **Process** — numbered steps, with hard limits restated.
-- **Outputs** — repo-root-relative paths. Several stages write into the product
+- **Process**: numbered steps, with hard limits restated.
+- **Outputs**: repo-root-relative paths. Several stages write into the product
   tree rather than the factory.
-- **Human check** — one concrete act, not "review the code".
+- **Human check**: one concrete act, not "review the code".
 
 At stage end, write `RESULT.md` beside the contract: what was built, the
 verification command **with its actual pasted output**, gotchas hit, and open

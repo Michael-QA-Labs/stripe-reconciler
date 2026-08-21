@@ -1,4 +1,4 @@
-# 00_prereqs — get the tools and the secret
+# 00_prereqs: get the tools and the secret
 
 One job: reach the point where `stripe listen --print-secret` returns a value.
 That secret backs every signature and replay test in stages 04a and 04b, so

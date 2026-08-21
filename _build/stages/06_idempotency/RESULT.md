@@ -1,4 +1,4 @@
-# 06_idempotency — RESULT
+# 06_idempotency: RESULT
 
 **Completed** 2026-08-20. Stage 07 is now current.
 

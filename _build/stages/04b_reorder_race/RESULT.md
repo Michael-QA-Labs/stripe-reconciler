@@ -1,4 +1,4 @@
-# 04b_reorder_race — RESULT
+# 04b_reorder_race: RESULT
 
 **Completed** 2026-08-19. Stage 05 is now current.
 

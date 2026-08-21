@@ -1,4 +1,4 @@
-# 02_transition_table — RESULT
+# 02_transition_table: RESULT
 
 **Completed** 2026-08-19. Stage 03 is now current.
 

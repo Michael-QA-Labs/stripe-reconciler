@@ -1,4 +1,4 @@
-# 03_lifecycle_suite — RESULT
+# 03_lifecycle_suite: RESULT
 
 **Completed** 2026-08-19. Stage 04a is now current.
 

@@ -1,4 +1,4 @@
-# 02_transition_table — write the oracle first
+# 02_transition_table: write the oracle first
 
 One job: the states-by-events table, legal and illegal, written **before** any
 handler code. It is the oracle for stage 04b, and later for Hypothesis (v2 step

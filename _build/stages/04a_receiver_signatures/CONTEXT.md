@@ -1,4 +1,4 @@
-# 04a_receiver_signatures — the handler and the front door
+# 04a_receiver_signatures: the handler and the front door
 
 One job: a working `POST /webhook` that verifies signatures, routes by event
 type, applies the state machine, and dedupes on event id. Plus the signature

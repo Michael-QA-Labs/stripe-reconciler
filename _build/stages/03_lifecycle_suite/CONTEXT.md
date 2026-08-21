@@ -1,4 +1,4 @@
-# 03_lifecycle_suite — the real API, serially
+# 03_lifecycle_suite: the real API, serially
 
 One job: exercise the full payment lifecycle against live Stripe test mode, and
 confirm the object model before any webhook handling depends on it.

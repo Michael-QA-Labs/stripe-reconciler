@@ -1,4 +1,4 @@
-# 06_idempotency — our key handling, not Stripe's
+# 06_idempotency: our key handling, not Stripe's
 
 One job: `POST /payments` honors an `Idempotency-Key` header correctly, including
 under concurrency. This tests our implementation. Stripe has its own idempotency

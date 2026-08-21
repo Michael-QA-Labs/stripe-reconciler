@@ -1,4 +1,4 @@
-# 04b_reorder_race — make the headline claim true
+# 04b_reorder_race: make the headline claim true
 
 One job: prove that the final state is independent of delivery order. This is
 the stage the README's opening sentence rests on. Without it, the project claims

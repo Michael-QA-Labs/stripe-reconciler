@@ -1,4 +1,4 @@
-# 05_checkout_playwright — RESULT
+# 05_checkout_playwright: RESULT
 
 **Completed** 2026-08-20. Stage 06 is now current.
 

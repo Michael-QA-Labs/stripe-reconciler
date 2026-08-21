@@ -1,4 +1,4 @@
-# 00_prereqs — RESULT
+# 00_prereqs: RESULT
 
 **Completed** 2026-08-18. Stage 01 is now current.
 

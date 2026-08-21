@@ -1,4 +1,4 @@
-# 07_ci_deploy_readme — make it linkable
+# 07_ci_deploy_readme: make it linkable
 
 One job: CI that splits correctly, a published Allure report with a real trend,
 the full service on the live URL, and a README that earns three minutes of a

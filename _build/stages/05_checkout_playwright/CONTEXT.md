@@ -1,4 +1,4 @@
-# 05_checkout_playwright — the browser flow
+# 05_checkout_playwright: the browser flow
 
 One job: a real browser drives a real card through Stripe hosted Checkout, and
 the resulting server-side state is asserted over a different protocol. That
