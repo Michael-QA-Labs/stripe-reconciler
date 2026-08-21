@@ -1,3 +1,6 @@
+import hashlib
+import json
+import sqlite3
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -34,6 +37,121 @@ def health():
 # The two endpoints that carry the real logic exist from day one, and say
 # plainly that they do nothing yet. A stub returning 200 is a stub a later
 # suite can pass against without noticing.
+# Matches Stripe's own key expiry (D-018). Module level so a test can shorten
+# it and prove expiry without controlling the clock or touching the database.
+IDEMPOTENCY_TTL_HOURS = 24
+
+
+def _request_hash(payload: bytes) -> str:
+    """Hash the raw body, not the parsed one.
+
+    Two payloads that parse to equal dicts can differ byte for byte, and the
+    guarantee being made is about the request that was sent.
+    """
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _claim_key(key: str, request_hash: str):
+    """Try to take ownership of an idempotency key. Insert first, always.
+
+    The primary key is the arbiter, not a preceding SELECT. Checking then
+    inserting leaves a window where two concurrent requests both read "absent"
+    and both proceed, and the window is exactly the case this stage exists to
+    close. Insert first and let the constraint decide who won.
+
+    Returns one of:
+      ("owned",    None)    caller does the work and records the response
+      ("cached",   payload) the work was already done under this key
+      ("conflict", None)    another request holds the key and has not finished
+      ("mismatch", None)    the key was first used with a different body
+    """
+    conn = db.connect()
+    conn.isolation_level = None
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            conn.execute(
+                "INSERT INTO idempotency_keys (key, request_hash) VALUES (?, ?)",
+                (key, request_hash),
+            )
+            conn.execute("COMMIT")
+            return ("owned", None)
+        except sqlite3.IntegrityError:
+            pass
+
+        row = conn.execute(
+            "SELECT request_hash, response_json,"
+            " (julianday('now') - julianday(created_at)) * 24.0 AS age_hours"
+            " FROM idempotency_keys WHERE key = ?",
+            (key,),
+        ).fetchone()
+
+        if row["age_hours"] >= IDEMPOTENCY_TTL_HOURS:
+            # Expired keys are reusable, which is the whole point of a TTL. The
+            # row is reset rather than deleted so the key keeps one home.
+            conn.execute(
+                "UPDATE idempotency_keys SET request_hash = ?, response_json = NULL,"
+                " created_at = datetime('now') WHERE key = ?",
+                (request_hash, key),
+            )
+            conn.execute("COMMIT")
+            return ("owned", None)
+
+        conn.execute("COMMIT")
+
+        if row["request_hash"] != request_hash:
+            return ("mismatch", None)
+        if row["response_json"] is None:
+            return ("conflict", None)
+        return ("cached", json.loads(row["response_json"]))
+    finally:
+        conn.close()
+
+
+def _record_response(key: str, response: dict) -> None:
+    conn = db.connect()
+    try:
+        conn.execute(
+            "UPDATE idempotency_keys SET response_json = ? WHERE key = ?",
+            (json.dumps(response), key),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _release_key(key: str) -> None:
+    """Give the key back when the work failed.
+
+    Without this a failed attempt leaves a row with no response, and every
+    retry with that key answers 409 until the TTL expires. A caller retrying
+    after an error is the ordinary case, not an abuse of the key.
+    """
+    conn = db.connect()
+    try:
+        conn.execute("DELETE FROM idempotency_keys WHERE key = ?", (key,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _create_payment_intent(amount: int, currency: str) -> dict:
+    """The direct branch, and the seam the idempotency suite substitutes.
+
+    Returning a plain dict rather than the SDK object keeps the response
+    JSON-serializable for the key cache, and follows the same reasoning as
+    webhook.verify: the less of our logic depends on SDK object semantics, the
+    less an SDK upgrade can quietly change.
+    """
+    client = stripe.StripeClient(
+        config.STRIPE_SECRET_KEY, stripe_version=config.STRIPE_API_VERSION
+    )
+    intent = client.v1.payment_intents.create(
+        params={"amount": amount, "currency": currency}
+    )
+    return {"id": intent.id, "status": intent.status, "amount": intent.amount}
+
+
 def _create_checkout_session(amount: int, currency: str, base_url: str):
     """Create a hosted Checkout Session for the demo page.
 
@@ -75,30 +193,75 @@ def _create_checkout_session(amount: int, currency: str, base_url: str):
     )
 
 
-@app.post("/payments")
-async def create_payment(request: Request, body: dict | None = Body(default=None)):
-    """Two branches, one of which is still honestly unbuilt.
-
-    The Checkout branch is stage 05's. Direct PaymentIntent creation is stage
-    06's, along with Idempotency-Key handling, and it still answers 501 rather
-    than pretending: a stub that returns success is one a later suite passes
-    against without noticing.
+async def _dispatch_payment(request: Request, body: dict) -> dict:
+    """Two branches: hosted Checkout, or a PaymentIntent created directly.
 
     A Session carries no PaymentIntent when it is created. The id appears only
     once the customer begins paying, which is why session events are resolved to
     the intent they reference (D-006) rather than assumed to carry one, and why
     the handler treats a session without an intent as a real case.
     """
-    if (body or {}).get("mode") != "checkout":
-        raise HTTPException(status_code=501, detail="not implemented until stage 06")
+    amount = body.get("amount", 2000)
+    currency = body.get("currency", "usd")
 
-    session = await run_in_threadpool(
-        _create_checkout_session,
-        body.get("amount", 2000),
-        body.get("currency", "usd"),
-        str(request.base_url).rstrip("/"),
-    )
-    return {"id": session.id, "url": session.url}
+    if body.get("mode") == "checkout":
+        session = await run_in_threadpool(
+            _create_checkout_session, amount, currency,
+            str(request.base_url).rstrip("/"),
+        )
+        return {"id": session.id, "url": session.url}
+
+    return await run_in_threadpool(_create_payment_intent, amount, currency)
+
+
+@app.post("/payments")
+async def create_payment(request: Request, body: dict | None = Body(default=None)):
+    """Create a payment, at most once per Idempotency-Key.
+
+    The key is handled before the branch, so both hosted Checkout and direct
+    creation are covered by one implementation rather than two.
+
+    The semantics match what Stripe's own API was measured doing, rather than
+    what would be convenient: a replay with the same body returns the first
+    response, a replay with a different body is a 400, and a request arriving
+    while the first is still in flight is a 409. The header is optional, and
+    without it nothing is cached, which is also Stripe's behaviour.
+
+    This is our implementation, not Stripe's. Passing a key through to Stripe
+    and observing that Stripe deduplicates would prove nothing about this repo.
+    """
+    body = body or {}
+    key = request.headers.get("Idempotency-Key")
+
+    if not key:
+        return await _dispatch_payment(request, body)
+
+    payload = await request.body()
+    state, cached = await run_in_threadpool(_claim_key, key, _request_hash(payload))
+
+    if state == "mismatch":
+        raise HTTPException(
+            status_code=400,
+            detail="this Idempotency-Key was first used with a different request body",
+        )
+    if state == "conflict":
+        raise HTTPException(
+            status_code=409,
+            detail="another request with this Idempotency-Key is still in flight",
+        )
+    if state == "cached":
+        return cached
+
+    try:
+        result = await _dispatch_payment(request, body)
+    except Exception:
+        # The work failed, so the key was never spent. Holding it would answer
+        # 409 to every retry until the TTL expired.
+        await run_in_threadpool(_release_key, key)
+        raise
+
+    await run_in_threadpool(_record_response, key, result)
+    return result
 
 
 @app.post("/webhook")

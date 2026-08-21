@@ -329,3 +329,61 @@ Pinned by `test_an_absorbed_event_still_fills_an_amount_the_record_does_not_have
 which fails without the fix, and by
 `test_an_absorbed_event_never_overwrites_an_amount_already_known`, which fails
 against the careless version of the same fix that omits the `IS NULL` guard.
+
+
+## D-018: Idempotency keys expire after 24 hours
+**Stage** 06 | **Date** 2026-08-20
+
+Matching Stripe's own key expiry, which `_shared/stripe-facts.md` records from
+the documentation. Three reasons, in the order they actually decided it:
+
+- **A caller integrating with both should not have to hold two models in
+  their head.** If our key expires on a different schedule from Stripe's, the
+  window where a retry is safe differs between two endpoints in the same
+  payment flow, and that difference is invisible until it costs someone money.
+- **Keys cannot be kept forever.** The table would grow without bound, and a
+  key retained indefinitely means a caller who reuses a string a year later
+  silently gets a year-old response instead of a payment.
+- **Twenty-four hours is long enough to cover the retries that matter.**
+  Network failures, deploys, and queue backlogs are resolved in minutes or
+  hours. A caller still retrying a day later is starting new work.
+
+Expiry is a read-time decision, not a sweep. A key older than the window is
+treated as absent and taken over in place. There is no background job to
+schedule, monitor, or forget to run, and no window in which an expired key is
+still honoured because the cleaner has not reached it yet.
+
+`IDEMPOTENCY_TTL_HOURS` sits at module scope so a test can shorten it to zero
+and take the same code path a real expiry reaches in a day. That is what makes
+the TTL testable without controlling the clock or writing a stale row directly
+into the database, which conventions forbid.
+
+## D-019: Our key semantics mirror Stripe's, and were measured rather than assumed
+**Stage** 06 | **Date** 2026-08-20
+
+`POST /payments` answers a keyed request the way Stripe's own API does. That was
+established by firing the three cases at the sandbox on the pinned API version
+rather than from memory:
+
+```
+same key, same body, sequential   200, the identical object returned
+same key, different body          400 IdempotencyError
+same key, concurrent              one 200, the rest 409 "another in-progress
+                                  request using this Idempotent Key"
+```
+
+Ours matches all three, and the header stays optional as it is at Stripe.
+
+The 409 is the one worth defending, because the contract said "two threads both
+getting 200 is fine" and waiting for the winner's response would have delivered
+that. It was rejected: a payments API that behaves differently from the one it
+sits next to is a trap for whoever integrates with it, and the wait needs a
+timeout that is either too short to help or long enough to hold a request open
+while the caller has already given up. Refusing immediately is honest about
+what happened, and the caller already has a retry path, because that is what an
+idempotency key is for.
+
+A failed attempt releases its key rather than holding it. Retrying after an
+error is the ordinary case, and a held key would answer 409 to every retry
+until the TTL expired, leaving the caller no recourse but to invent a new key,
+which defeats the point of having one.

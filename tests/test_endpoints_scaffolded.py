@@ -6,14 +6,30 @@ the kind of thing a later suite passes against without noticing.
 
 from fastapi.testclient import TestClient
 
+from service import main
 from service.main import app
 
 client = TestClient(app)
 
 
-def test_payments_endpoint_exists_and_is_not_implemented():
+def test_payments_endpoint_is_implemented(monkeypatch):
+    """Stage 06 redeemed the 501 this test used to assert.
+
+    The creation seam is substituted rather than called. Without that this file
+    would make a real Stripe call on every plain `pytest`, and a default run is
+    supposed to need no network and no key.
+    """
+    monkeypatch.setattr(
+        main,
+        "_create_payment_intent",
+        lambda amount, currency: {"id": "pi_stub", "status": "requires_payment_method",
+                                  "amount": amount},
+    )
+
     response = client.post("/payments", json={"amount": 1000})
-    assert response.status_code == 501
+
+    assert response.status_code == 200
+    assert response.json()["id"] == "pi_stub"
 
 
 def test_webhook_endpoint_rejects_an_unsigned_request():
