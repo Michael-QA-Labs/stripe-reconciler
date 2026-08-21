@@ -12,6 +12,10 @@ __pycache__/
 test-results/
 playwright-report/
 
+# Coverage
+.coverage
+coverage.xml
+
 # Allure
 allure-results/
 allure-report/

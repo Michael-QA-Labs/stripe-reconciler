@@ -29,6 +29,20 @@ that logic explicitly, as a transition table where terminal states absorb and
 state never regresses, and then tests it against duplicate, reordered, and late
 delivery rather than asserting it works.
 
+## Watch it work
+
+![A browser paying through Stripe hosted Checkout, and the receiver recording the result](docs/demo-checkout.gif)
+
+A real browser drives a real test card through Stripe's own hosted Checkout
+page. The payment succeeds, and the webhook that records it arrives separately,
+a moment later. That gap is the whole subject of this repo.
+
+This is the [Playwright suite](tests/browser/test_checkout.py) running headed,
+not a mockup. The assertion it makes is deliberately cross protocol: the browser
+causes the payment, and the check happens over HTTP against our own receiver
+after Stripe delivers the event. Asserting on Stripe's success page would prove
+only that Stripe works.
+
 ## How a delivery is handled
 
 Every webhook delivery walks the same nine steps. Nothing buffers, nothing
@@ -159,3 +173,89 @@ Two details in that table are worth pausing on. `requires_capture` sits below
 `refunded` is this project's state and not Stripe's, whose PaymentIntent status
 enum has seven values and no refunded among them, because refunds live on the
 Charge. Since the PaymentIntent is the canonical record, a refund lands here.
+
+## Try it live
+
+**<https://stripe-reconciler-w6m7.onrender.com>**
+
+| Path | What you get |
+|---|---|
+| [`/health`](https://stripe-reconciler-w6m7.onrender.com/health) | status, and the pinned Stripe API version |
+| [`/docs`](https://stripe-reconciler-w6m7.onrender.com/docs) | interactive Swagger UI for the whole surface |
+| [`/app`](https://stripe-reconciler-w6m7.onrender.com/app) | the demo page, which starts a real hosted Checkout session |
+
+Two constraints worth stating rather than letting you discover them.
+
+**The filesystem is ephemeral, so the deployed database is not durable.** Render's
+free tier wipes it on every spin-down and redeploy. That is a deliberate choice
+and not an oversight: every test in this repo runs against a local instance, so
+no suite depends on deployed persistence, and paying for Postgres to hold demo
+rows would buy nothing. The consequence is real though, and it is the reason
+step 8 above exists at all. Because the database is empty after each redeploy, a
+refund arriving for an older payment is a first sighting, which is exactly the
+case that used to record an amount of NULL forever.
+
+**The first request after an idle period takes about twenty seconds.** Free tier
+instances spin down, and the cold start was measured at 22 seconds rather than
+the 50 plus often quoted. For a browser that is a slow page load. For Stripe it
+is not a problem at all, because a webhook delivery that times out is retried,
+and retried deliveries are the case this receiver is built to absorb. The
+failure mode heals itself using the same machinery the repo exists to
+demonstrate.
+
+The live URL is a demo endpoint, not a durable store.
+
+## How the tests are split, and why
+
+Ninety tests. Eighty one run offline on every push, and nine talk to real
+Stripe. The split is a deliberate call about what to gate on, not an artifact
+of where files sit, so [the CI workflow](.github/workflows/ci.yml) has three
+jobs rather than one.
+
+| Job | What it runs | Gating |
+|---|---|---|
+| `fast` | 81 tests: signatures, ordering, idempotency, the state machine | **blocking** |
+| `live` | 6 tests: the lifecycle suite plus one real PaymentIntent creation | **blocking**, serial, skipped on fork PRs |
+| `browser` | 3 tests: hosted Checkout in a real browser | non-blocking, traces uploaded |
+
+The reasoning, job by job:
+
+- **`fast` blocks because it covers the logic this repo is about.** The
+  sequencing rule, the dedupe, and the idempotency store are ours, so a
+  regression in them is a real defect. It needs no network and no secret, which
+  is what makes it safe to run on a fork PR and fast enough to run on every
+  push. Coverage of `service/` currently sits at 97 percent from this job alone.
+- **`live` blocks but runs serially, and never as a matrix.** It is the only
+  thing that would notice if the real Stripe client broke, because everything
+  else substitutes it. It is skipped on fork PRs because Actions withholds
+  secrets from them, so it would fail there for a reason that has nothing to do
+  with the change. Serial matters for a concrete reason: one of these tests
+  creates a real PaymentIntent per run, and a matrix would multiply that by
+  however many legs it had.
+- **`browser` does not block.** It drives a third party's page, which takes
+  roughly fifteen seconds to render headless and can change without warning.
+  That is not this repo's correctness, and a job that goes red for someone
+  else's reasons trains everyone to ignore CI. It reports, and uploads its
+  traces when something fails.
+
+The marker is the mechanism rather than the directory. `pyproject.toml` sets
+`addopts = -m "not live"`, so a plain `pytest` **is** the offline suite and
+`-m live` is an explicit opt in. That matters more than it looks: a command
+that passes by running nothing is the worst available failure mode, and it
+happened here once during stage 05.
+
+## Running it yourself
+
+```
+uv venv --python 3.13 && uv pip install -r requirements-dev.txt
+git config core.hooksPath .githooks     # the pre-commit secret scan
+pytest                                  # the 81 offline tests, no secrets needed
+```
+
+The hook line is not optional if you intend to commit. This repo handles real
+Stripe keys throughout, and `.gitignore` protects `.env` and nothing else: it
+does nothing about a key pasted into a source file, a fixture, or a debugging
+print, which is the realistic way a repo like this leaks.
+
+To run the live suites you need a Stripe test mode key in `.env`, and for the
+browser tests the Stripe CLI plus `playwright install chromium`.

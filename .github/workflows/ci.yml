@@ -1,0 +1,183 @@
+# Three jobs, split by what a test actually needs rather than by where it sits
+# in the tree. The split is a claim the README makes, so it is deliberate:
+#
+#   fast     no network, no secrets, no browser. Blocking, and the gate that
+#            matters, because it covers the sequencing and idempotency logic
+#            this repo exists to prove.
+#   live     talks to real Stripe test mode. Blocking, serial, and skipped on
+#            fork PRs, where Actions withholds secrets and the job would fail
+#            for a reason that has nothing to do with the code.
+#   browser  drives Stripe hosted Checkout in a real browser. Non-blocking,
+#            because a third party's page rendering is not this repo's
+#            correctness, and a red X there would train everyone to ignore CI.
+#
+# The marker is the mechanism. pyproject.toml sets addopts = -m "not live", so
+# a plain pytest already IS the fast job and -m live is the explicit opt in.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# The live jobs create real objects in the Stripe sandbox, one PaymentIntent
+# per run for idempotency alone. Overlapping runs would multiply that against
+# an account capped at 25 requests a second, so runs queue instead of racing.
+# Not cancel-in-progress: a half finished live run should still tear down.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # 3.13 everywhere, matching D-001 and render.yaml's PYTHON_VERSION.
+  PYTHON_VERSION: "3.13"
+  # Pinned like every other dependency. The browser suite shells out to
+  # `stripe listen`, so the CLI is a real dependency of this pipeline even
+  # though pip knows nothing about it.
+  STRIPE_CLI_VERSION: "1.50.3"
+
+jobs:
+  fast:
+    name: fast, no Stripe
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install
+        run: pip install -r requirements-dev.txt
+
+      - name: Run the offline suite
+        # No secrets in this environment on purpose. If anything here starts
+        # needing one, the split has quietly broken and this job should fail.
+        run: |
+          pytest \
+            --cov=service \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --alluredir=allure-results
+
+      - name: Coverage to the job summary
+        # The README badge is deferred until the Allure and Pages question is
+        # settled. Measuring it is not: the number is produced from the first
+        # run, so wiring a badge later is a link rather than a new capability.
+        run: |
+          echo '### Coverage' >> "$GITHUB_STEP_SUMMARY"
+          coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the Allure results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-fast
+          path: allure-results
+          retention-days: 30
+
+      - name: Keep the coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          retention-days: 30
+
+  live:
+    name: live, real Stripe test mode
+    runs-on: ubuntu-latest
+    # Fork PRs get no secrets, so this would fail on every one of them for a
+    # reason unrelated to the change. Skipped rather than failed.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install
+        run: pip install -r requirements-dev.txt
+
+      - name: Lifecycle and idempotency against Stripe
+        # Deliberately one job and no matrix. pytest runs serially by default
+        # and nothing here adds xdist, which matters because the idempotency
+        # live test creates a real PaymentIntent every run: a matrix would
+        # multiply that by however many legs it had.
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+        run: pytest -m live tests/lifecycle tests/idempotency --alluredir=allure-results
+
+      - name: Keep the Allure results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-live
+          path: allure-results
+          retention-days: 30
+
+  browser:
+    name: browser, hosted Checkout
+    runs-on: ubuntu-latest
+    # Non-blocking by contract. Hosted Checkout is a third party's page and it
+    # takes roughly fifteen seconds to render headless, so this job reports
+    # rather than gates. Its traces are the artifact worth having.
+    continue-on-error: true
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install
+        run: pip install -r requirements-dev.txt
+
+      - name: Install the chromium binary
+        # The pip package is not the browser. Without this step collection
+        # passes and the launch fails, which is the confusing way round.
+        run: playwright install --with-deps chromium
+
+      - name: Install the Stripe CLI
+        # The browser fixture spawns `stripe listen` to forward events to the
+        # receiver it starts, so the binary has to exist on the runner.
+        run: |
+          curl -fsSL \
+            "https://github.com/stripe/stripe-cli/releases/download/v${STRIPE_CLI_VERSION}/stripe_${STRIPE_CLI_VERSION}_linux_x86_64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin stripe
+          stripe --version
+
+      - name: Drive hosted Checkout
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          # `stripe listen` authenticates from this rather than from an
+          # interactive login, confirmed against the CLI's own help.
+          STRIPE_API_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          # The receiver verifies against both secrets it holds. This is the
+          # one `stripe listen` signs with, and it is stable per account rather
+          # than minted per session, which is what makes a stored secret work
+          # here at all.
+          STRIPE_WEBHOOK_SECRET_CLI: ${{ secrets.STRIPE_WEBHOOK_SECRET_CLI }}
+        run: |
+          pytest -m live tests/browser \
+            --tracing=retain-on-failure \
+            --video=retain-on-failure \
+            --output=browser-artifacts
+
+      - name: Keep the traces and video
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-artifacts
+          path: browser-artifacts
+          retention-days: 30
