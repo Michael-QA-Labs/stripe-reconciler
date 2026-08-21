@@ -33,4 +33,30 @@ if git diff --cached --name-only | grep -qE '(^|/)\.env$'; then
     exit 1
 fi
 
+# Em and en dashes in prose. conventions.md forbids them, and a rule nobody
+# enforces drifts: 18 files had quietly accumulated 21 of them before this
+# check existed, including every stage title.
+#
+# Markdown only, on purpose. Code, fixtures and captured Stripe payloads can
+# legitimately carry a dash as data, and a cosmetic check that fires on real
+# data is how you train yourself to bypass the secret scan above.
+#
+# For the same reason this has its own escape hatch rather than sharing
+# --no-verify, which would skip the secret scan too:
+#   ALLOW_DASH=1 git commit
+DASHES=$(git diff --cached --unified=0 -- '*.md' \
+    | grep -E '^\+' | grep -vE '^\+\+\+' | grep -n -e '—' -e '–')
+
+if [ -n "$DASHES" ] && [ -z "$ALLOW_DASH" ]; then
+    echo ""
+    echo "BLOCKED: staged Markdown contains an em or en dash"
+    echo ""
+    echo "$DASHES" | sed 's/^/  /'
+    echo ""
+    echo "conventions.md: use a comma, colon, parentheses or a full stop."
+    echo "If the dash is genuinely data: ALLOW_DASH=1 git commit"
+    echo ""
+    exit 1
+fi
+
 exit 0
