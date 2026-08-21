@@ -36,6 +36,9 @@ env:
   # `stripe listen`, so the CLI is a real dependency of this pipeline even
   # though pip knows nothing about it.
   STRIPE_CLI_VERSION: "1.50.3"
+  # The report generator is a Java tool, not a pip package, so it is
+  # fetched and pinned here like the Stripe CLI.
+  ALLURE_VERSION: "2.45.0"
 
 jobs:
   fast:
@@ -181,3 +184,103 @@ jobs:
           name: browser-artifacts
           path: browser-artifacts
           retention-days: 30
+
+  report:
+    name: allure report to Pages
+    runs-on: ubuntu-latest
+    # Only after both blocking jobs, and only on main. A pull request must not
+    # overwrite the published report with results from an unmerged branch.
+    needs: [fast, live]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collect the results from both test jobs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: allure-results-*
+          path: collected
+          merge-multiple: true
+
+      - name: Collect the coverage report
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-xml
+          path: collected-coverage
+
+      - name: Take the previous report's history
+        # The classic failure here is a report that renders with an empty trend
+        # chart. Allure builds the trend from a history directory carried in
+        # with the results, so the published site's history has to be copied
+        # back in before generating. Without this the chart has one point every
+        # time. The branch does not exist on the first run, which is why this
+        # step is allowed to fail.
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: published
+
+      - name: Assemble the results
+        run: |
+          mkdir -p allure-results
+          cp -r collected/. allure-results/ 2>/dev/null || true
+          if [ -d published/history ]; then
+            mkdir -p allure-results/history
+            cp -r published/history/. allure-results/history/
+            echo "carried $(ls published/history | wc -l) history files forward"
+          else
+            echo "no previous history, this is the first run"
+          fi
+
+      - name: Install Allure
+        run: |
+          curl -fsSL "https://github.com/allure-framework/allure2/releases/download/${ALLURE_VERSION}/allure-${ALLURE_VERSION}.tgz" \
+            | sudo tar -xz -C /opt
+          echo "/opt/allure-${ALLURE_VERSION}/bin" >> "$GITHUB_PATH"
+
+      - name: Generate the report
+        run: |
+          allure generate allure-results --clean -o allure-report
+          # Informational, not a gate. The first run legitimately has no
+          # previous history to carry, so the trend only proves itself across
+          # two consecutive runs, which is what the contract asks to verify.
+          if [ -d allure-report/history ]; then
+            echo "report carries history: $(ls allure-report/history | wc -l) files"
+          else
+            echo "WARNING: generated report has no history directory"
+          fi
+
+      - name: Write the coverage badge endpoint
+        # A shields.io endpoint badge rather than a third party coverage
+        # service: no account, no upload token, and the number is produced by
+        # the same run that produced the report beside it.
+        run: |
+          python3 - <<'PYEOF'
+          import json, pathlib, xml.etree.ElementTree as ET
+          rate = float(ET.parse("collected-coverage/coverage.xml").getroot().get("line-rate"))
+          pct = round(rate * 100)
+          colour = "brightgreen" if pct >= 90 else "green" if pct >= 80 else "yellow" if pct >= 60 else "red"
+          pathlib.Path("allure-report/coverage.json").write_text(json.dumps({
+              "schemaVersion": 1, "label": "coverage", "message": f"{pct}%", "color": colour,
+          }))
+          print(f"coverage badge: {pct}%")
+          PYEOF
+
+      - name: Publish
+        # Plain git rather than a third party publishing action. The history is
+        # already inside the generated report, so replacing the branch wholesale
+        # loses nothing and keeps the branch from growing without bound.
+        run: |
+          cd allure-report
+          git init -q
+          git checkout -q -b gh-pages
+          git add -A
+          git -c user.email="actions@github.com" -c user.name="github-actions" \
+            commit -q -m "Allure report for ${GITHUB_SHA}"
+          git push -q -f \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
