@@ -10,7 +10,7 @@ a stale number here would silently poison the suites that depend on it.
 |---|---|---|
 | **Pinned API version** | **`2026-07-29.dahlia`** | `stripe-version` response header on a live call to `/v1/balance` |
 | Stripe CLI | 1.50.1 (brew `stripe-cli`) | `stripe --version` |
-| Account | sandbox `QA sandbox`, `acct_1U5diKQqVBpO9CGf` | `stripe config --list` |
+| Account | sandbox `QA sandbox`, `acct_[REDACTED]` | `stripe config --list` |
 | CLI key expiry | 2026-11-16 (90 days from `stripe login`) | CLI config |
 | CLI signing secret | in `.env`, never here | `stripe listen --print-secret` |
 | Dashboard signing secret | in `.env`, captured at stage 01 | Dashboard webhook settings, destination `render-deployment` |

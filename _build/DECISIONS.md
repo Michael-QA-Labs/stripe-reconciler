@@ -12,8 +12,7 @@ and say so in both.
 **Stage** Act 0 | **Date** 2026-08-18
 
 3.11, 3.13 and 3.14 are all installed. Pinning 3.13: it is the newest version
-with mature wheels across playwright, and later mutmut. Same reasoning already
-recorded in `~/projects/groundtruth-rag/requirements.txt` for torch.
+with mature wheels across playwright, and later mutmut.
 
 ## D-002: Original scope step 4 splits into 04a and 04b
 **Stage** Act 0 | **Date** 2026-08-18

@@ -6,11 +6,13 @@ Stable across every stage. Load this with any stage that writes code.
 
 - **3.13**, pinned. See `D-001`.
 - `uv venv --python 3.13` for the environment, `uv pip install -r
-  requirements.txt` to install. uv for speed; a plain `requirements.txt` so CI
-  and Render read it without needing uv.
+  requirements-dev.txt` to install. uv for speed; plain requirements files so
+  CI and Render read them without needing uv.
+- **Two requirements files.** `requirements.txt` is the service alone, because
+  Render's buildCommand installs it directly. `requirements-dev.txt` includes it
+  and adds the test and reporting stack.
 - **Every dependency pinned to an exact version, with a why-comment** where the
-  choice is not obvious. Matches the house style in
-  `~/projects/groundtruth-rag/requirements.txt`.
+  choice is not obvious.
 
 ## Git
 
