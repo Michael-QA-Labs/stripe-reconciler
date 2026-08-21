@@ -1,0 +1,2 @@
+{"event_id": "evt_1", "payment_id": "pi_1", "state_before": "none", "state_after": "refunded", "absorbed": false}
+{"event_id": "evt_2", "payment_id": "pi_1", "state_before": "refunded", "state_after": "refunded", "absorbed": true}

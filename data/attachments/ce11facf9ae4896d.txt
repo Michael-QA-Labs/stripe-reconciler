@@ -1,0 +1,5 @@
+{"event_id": "evt_c1", "payment_id": "pi_1", "state_before": "none", "state_after": "requires_payment_method", "absorbed": false}
+{"event_id": "evt_c5", "payment_id": "pi_1", "state_before": "requires_payment_method", "state_after": "refunded", "absorbed": false}
+{"event_id": "evt_c2", "payment_id": "pi_1", "state_before": "refunded", "state_after": "refunded", "absorbed": true}
+{"event_id": "evt_c3", "payment_id": "pi_1", "state_before": "refunded", "state_after": "refunded", "absorbed": true}
+{"event_id": "evt_c4", "payment_id": "pi_1", "state_before": "refunded", "state_after": "refunded", "absorbed": true}

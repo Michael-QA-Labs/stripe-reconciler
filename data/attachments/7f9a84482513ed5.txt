@@ -1,0 +1,2 @@
+INFO     stripe_reconciler:logging_setup.py:42 {"event_id": "evt_1", "payment_id": "pi_1", "state_before": "none", "state_after": "canceled", "absorbed": false}
+INFO     stripe_reconciler:logging_setup.py:42 {"event_id": "evt_2", "payment_id": "pi_1", "state_before": "canceled", "state_after": "succeeded", "absorbed": false}

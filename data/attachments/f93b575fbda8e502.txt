@@ -1,0 +1,1 @@
+{"event_id": "evt_stale", "payment_id": "pi_456", "state_before": "succeeded", "state_after": "succeeded", "absorbed": true}

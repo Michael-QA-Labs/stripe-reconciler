@@ -1,0 +1,3 @@
+{"event_id": "evt_processing", "payment_id": "pi_1", "state_before": "none", "state_after": "processing", "absorbed": false}
+{"event_id": "evt_created", "payment_id": "pi_1", "state_before": "processing", "state_after": "processing", "absorbed": true}
+{"event_id": "evt_succeeded", "payment_id": "pi_1", "state_before": "processing", "state_after": "succeeded", "absorbed": false}

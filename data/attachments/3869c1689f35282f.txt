@@ -1,0 +1,3 @@
+INFO     stripe_reconciler:logging_setup.py:42 {"event_id": "evt_created", "payment_id": "pi_1", "state_before": "none", "state_after": "requires_payment_method", "absorbed": false}
+INFO     stripe_reconciler:logging_setup.py:42 {"event_id": "evt_succeeded", "payment_id": "pi_1", "state_before": "requires_payment_method", "state_after": "succeeded", "absorbed": false}
+INFO     stripe_reconciler:logging_setup.py:42 {"event_id": "evt_processing", "payment_id": "pi_1", "state_before": "succeeded", "state_after": "succeeded", "absorbed": true}

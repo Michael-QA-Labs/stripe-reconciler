@@ -1,0 +1,364 @@
+"DESCRIPTION","DURATION IN MS","NAME","PARENT SUITE","START TIME","STATUS","STOP TIME","SUB SUITE","SUITE","TEST CLASS","TEST METHOD"
+"D-014, and the one place where order changes something visible.
+
+succeeded outranks canceled, so both orders end at succeeded and the state
+is order independent as everywhere else. What differs is legality: arriving
+at succeeded *out of* canceled is a transition the table calls impossible,
+so it is recorded as an anomaly. The reverse order never leaves canceled at
+all, because canceled cannot outrank succeeded, so nothing is flagged.
+
+This asymmetry is the whole reason D-014 ranks succeeded above canceled.
+Rank canceled higher instead and the contradiction is silently absorbed,
+the illegal transition machinery becomes dead code, and a mapping bug in
+our own receiver passes unnoticed.
+","11","test_the_contradictory_pair_converges_but_only_one_order_is_an_anomaly[canceled-then-succeeded]","tests.webhook","2026-08-21","passed","2026-08-21","","test_ordering","",""
+"","4","test_health_returns_200","tests","2026-08-21","passed","2026-08-21","","test_health","",""
+"","30","test_a_valid_event_is_accepted_and_recorded","tests.webhook","2026-08-21","passed","2026-08-21","","test_handler","",""
+"The seam's default, exercised once against Stripe.
+
+Everything above substitutes the creator, so nothing else here would notice
+if the real call were broken. This is the one test that would.
+","276","test_the_real_client_creates_a_payment_intent","tests.idempotency","2026-08-21","passed","2026-08-21","","test_idempotency","",""
+"The contract's second case, and it matches Stripe's measured 400.
+
+Reusing a key for different work is a caller bug, and the useful thing to do
+with it is refuse loudly. Returning the first response instead would answer
+a question that was never asked.
+","10","test_a_replay_with_a_different_body_is_refused","tests.idempotency","2026-08-21","passed","2026-08-21","","test_idempotency","",""
+"Five contradictory events at one payment, fired at once, no sequencing.
+
+This is the case BEGIN IMMEDIATE and WAL exist for. Each delivery reads the
+current state and writes the next one, and without the write lock taken up
+front those two steps interleave and a higher rank gets overwritten by a
+lower one that read stale state.
+
+The expected state is refunded because it is the highest rank in the set,
+and that expectation does not depend on who wins any race: the rule is
+monotonic, so whatever order the threads land in, rank 80 is applied and
+nothing below it can replace it. A test that accepted several states would
+be asserting almost nothing, which is why this asserts exactly one.
+
+A ""database is locked"" failure here is a WAL problem from stage 01, not a
+state machine problem. That distinction is why WAL was set up there.
+","34","test_concurrent_conflicting_deliveries_converge_without_corruption","tests.webhook","2026-08-21","passed","2026-08-21","","test_ordering","",""
+"Not every Checkout Session has one. That is a skip, not an exception.","1","test_a_session_without_a_payment_intent_resolves_to_nothing","tests.webhook","2026-08-21","passed","2026-08-21","","test_resolution","",""
+"Anything other than a clear yes must leave the endpoint closed.","10","test_introspection_404s_when_testing_is_not_true[false]","tests","2026-08-21","passed","2026-08-21","","test_introspection_gating","",""
+"The TTL, which the contract asks for but does not give a case.
+
+Expiry is proven by shortening the window rather than by controlling the
+clock or writing a stale row into the database. A zero hour TTL makes any
+existing key expired on sight, which is the same code path a real
+twenty-four hour expiry takes a day to reach.
+","13","test_an_expired_key_can_be_used_again","tests.idempotency","2026-08-21","passed","2026-08-21","","test_idempotency","",""
+"Every permutation of one lifecycle converges on the same state.
+
+The contract asks for succeeded before processing. All six orderings are
+run instead, because the claim is about the set and testing one reversal
+would leave the general case asserted only by argument.
+","13","test_final_state_is_independent_of_delivery_order[succeeded,processing,created]","tests.webhook","2026-08-21","passed","2026-08-21","","test_ordering","",""
+"State is a high water mark, so nothing below it can be written over it.
+
+payment_failed is the case worth naming: Stripe genuinely returns a failed
+PaymentIntent to requires_payment_method so it can be retried, and the
+table deliberately refuses that regression. The recorded state is the
+furthest progress ever observed, not Stripe's instantaneous status.
+
+None of these is an anomaly. Absorbing a late event is the design working,
+and flagging it would fire on every reordered delivery and teach a reader
+to ignore the flag.
+","10","test_a_stale_event_after_a_terminal_state_is_absorbed_not_applied[created]","tests.webhook","2026-08-21","passed","2026-08-21","","test_ordering","",""
+"State is a high water mark, so nothing below it can be written over it.
+
+payment_failed is the case worth naming: Stripe genuinely returns a failed
+PaymentIntent to requires_payment_method so it can be retried, and the
+table deliberately refuses that regression. The recorded state is the
+furthest progress ever observed, not Stripe's instantaneous status.
+
+None of these is an anomaly. Absorbing a late event is the design working,
+and flagging it would fire on every reordered delivery and teach a reader
+to ignore the flag.
+","12","test_a_stale_event_after_a_terminal_state_is_absorbed_not_applied[processing]","tests.webhook","2026-08-21","passed","2026-08-21","","test_ordering","",""
+"Stage 06's concurrent case is correct because of this constraint.
+
+Insert-first-and-let-the-constraint-arbitrate has no window; a
+check-then-insert does.
+","6","test_idempotency_keys_rejects_duplicate_key","tests","2026-08-21","passed","2026-08-21","","test_db","",""
+"","0","test_tampered_body_is_rejected","tests.webhook","2026-08-21","passed","2026-08-21","","test_signature","",""
+"Written from the documented scheme, verified against the SDK's verifier.","1","test_helper_produces_a_header_the_sdk_accepts","tests.webhook","2026-08-21","passed","2026-08-21","","test_signature","",""
+"State is a high water mark, so nothing below it can be written over it.
+
+payment_failed is the case worth naming: Stripe genuinely returns a failed
+PaymentIntent to requires_payment_method so it can be retried, and the
+table deliberately refuses that regression. The recorded state is the
+furthest progress ever observed, not Stripe's instantaneous status.
+
+None of these is an anomaly. Absorbing a late event is the design working,
+and flagging it would fire on every reordered delivery and teach a reader
+to ignore the flag.
+","12","test_a_stale_event_after_a_terminal_state_is_absorbed_not_applied[requires_action]","tests.webhook","2026-08-21","passed","2026-08-21","","test_ordering","",""
+"D-017. A refund seen first leaves a NULL amount nothing could ever fill.
+
+charge.refunded carries a Charge, which is not trusted for the intent's
+amount, and it claims the top rank. So the payment is created at refunded
+with no amount, and every later PaymentIntent event is absorbed on rank.
+Before the fix the amount stayed NULL permanently, which made the record
+order dependent even though the state was not.
+","10","test_an_absorbed_event_still_fills_an_amount_the_record_does_not_have","tests.webhook","2026-08-21","passed","2026-08-21","","test_handler","",""
+"","0","test_worked_orderings_replay_as_documented[events0-succeeded-False]","tests","2026-08-21","passed","2026-08-21","","test_table_matches_code","",""
+"","11","test_a_stale_event_is_absorbed_by_rank","tests.webhook","2026-08-21","passed","2026-08-21","","test_handler","",""
+"","0","test_worked_orderings_replay_as_documented[events3-succeeded-True]","tests","2026-08-21","passed","2026-08-21","","test_table_matches_code","",""
+"The contract's first case. The count is the assertion, not the status.","12","test_a_replay_with_the_same_key_returns_the_first_response","tests.idempotency","2026-08-21","passed","2026-08-21","","test_idempotency","",""
+"The health check names the pinned Stripe API version.
+
+Deploys are the place this matters: a service running an API version other
+than the one fixtures were captured against is the failure this surfaces,
+and reading it from /health is cheaper than reading it from the logs.
+","3","test_health_reports_ok_and_pinned_api_version","tests","2026-08-21","passed","2026-08-21","","test_health","",""
+"Correctly signed and still refused. A replayed payload is not a forged one.
+
+This is the pair that matters: without the 301 case, the 299 case would pass
+against a verifier that ignored timestamps entirely.
+","0","test_signature_301_seconds_old_is_rejected","tests.webhook","2026-08-21","passed","2026-08-21","","test_signature","",""
+"The resolution gap: data.object is a Charge, not a PaymentIntent.","10","test_a_refund_arrives_as_a_charge_and_still_finds_the_payment","tests.webhook","2026-08-21","passed","2026-08-21","","test_handler","",""
+"D-014, and the one place where order changes something visible.
+
+succeeded outranks canceled, so both orders end at succeeded and the state
+is order independent as everywhere else. What differs is legality: arriving
+at succeeded *out of* canceled is a transition the table calls impossible,
+so it is recorded as an anomaly. The reverse order never leaves canceled at
+all, because canceled cannot outrank succeeded, so nothing is flagged.
+
+This asymmetry is the whole reason D-014 ranks succeeded above canceled.
+Rank canceled higher instead and the contradiction is silently absorbed,
+the illegal transition machinery becomes dead code, and a mapping bug in
+our own receiver passes unnoticed.
+","13","test_the_contradictory_pair_converges_but_only_one_order_is_an_anomaly[succeeded-then-canceled]","tests.webhook","2026-08-21","passed","2026-08-21","","test_ordering","",""
+"","1","test_worked_orderings_replay_as_documented[events8-succeeded-False]","tests","2026-08-21","passed","2026-08-21","","test_table_matches_code","",""
+"Never 5xx for something we handled. Stripe retries 5xx and that makes duplicates.","14","test_an_unknown_event_type_is_acknowledged_and_changes_nothing","tests.webhook","2026-08-21","passed","2026-08-21","","test_handler","",""
+"Found by the stage 04a manual check, not by any automated test.
+
+caplog sets a level on the logger it captures, so the existing tests above
+passed while the logger was silent under uvicorn: nothing configured it, so
+INFO fell below the root logger's default WARNING and every transition line
+was dropped. Stage 04b debugs races by reading these lines, so a logger that
+works only under caplog is worse than none, because it looks wired.
+","0","test_the_transition_logger_actually_emits_without_test_configuration","tests","2026-08-21","passed","2026-08-21","","test_logging","",""
+"","0","test_payment_intent_events_use_the_object_id","tests.webhook","2026-08-21","passed","2026-08-21","","test_resolution","",""
+"","11","test_introspection_404s_when_testing_unset","tests","2026-08-21","passed","2026-08-21","","test_introspection_gating","",""
+"Illegal transitions are persisted, not just logged (D-015).
+
+A payment can accumulate more than one, and an on-call engineer needs to
+query them after a restart, so they get a table rather than a column.
+","5","test_init_creates_the_anomalies_table","tests","2026-08-21","passed","2026-08-21","","test_db","",""
+"","1","test_worked_orderings_replay_as_documented[events6-refunded-False]","tests","2026-08-21","passed","2026-08-21","","test_table_matches_code","",""
+"","1","test_transition_log_is_json_with_the_fields_04b_will_need","tests","2026-08-21","passed","2026-08-21","","test_logging","",""
+"","0","test_worked_orderings_replay_as_documented[events5-succeeded-False]","tests","2026-08-21","passed","2026-08-21","","test_table_matches_code","",""
+"Eight threads, one event id, contending on the dedupe insert.
+
+What this proves and what it does not is worth being exact about, because
+the obvious stronger claim is unprovable here. Under contention the losing
+threads hit the primary key, ROLLBACK, and return, all while holding or
+waiting on BEGIN IMMEDIATE. This asserts that path does not deadlock, does
+not raise, and does not answer anything but 200, since a 5xx would make
+Stripe retry and manufacture the very duplicates being absorbed.
+
+It does NOT prove the event was applied exactly once. Nothing observable
+through the introspection endpoint can: with dedupe removed the repeats are
+absorbed by rank instead, because a duplicate claims a state of equal rank
+and equal is not strictly higher. That independence is the table's design
+rather than a gap in it, and the single threaded case above is what proves
+dedupe specifically, by replaying an id with a claim that outranks the
+recorded state so that rank cannot do the absorbing.
+","29","test_concurrent_deliveries_of_one_event_id_do_not_error","tests.webhook","2026-08-21","passed","2026-08-21","","test_ordering","",""
+"","0","test_event_claims_match_the_table","tests","2026-08-21","passed","2026-08-21","","test_table_matches_code","",""
+"","2","test_a_bad_signature_is_rejected","tests.webhook","2026-08-21","passed","2026-08-21","","test_handler","",""
+"The reason `refunded` is our state and not Stripe's.
+
+Refunding a succeeded payment leaves the PaymentIntent reading `succeeded`.
+The refund is visible on the Charge, not on the intent. Since D-006 makes
+the PaymentIntent canonical for us, a refund has nowhere to land unless we
+add a state for it, which is exactly what the transition table does.
+","2122","test_refund_does_not_change_the_payment_intent_status","tests.lifecycle","2026-08-21","passed","2026-08-21","","test_lifecycle","",""
+"","0","test_worked_orderings_replay_as_documented[events11-refunded-True]","tests","2026-08-21","passed","2026-08-21","","test_table_matches_code","",""
+"Guards against a catch-all that would make the 501s meaningless.","3","test_unknown_route_is_404_not_501","tests","2026-08-21","passed","2026-08-21","","test_endpoints_scaffolded","",""
+"Default capture is automatic, so confirming a card settles in one step.
+
+This is the flow with no requires_capture in it, which is why the capture
+test below has to ask for manual capture explicitly.
+","601","test_confirm_succeeds_immediately_with_automatic_capture","tests.lifecycle","2026-08-21","passed","2026-08-21","","test_lifecycle","",""
+"A Charge's amount is not necessarily the intent's, so it is not trusted.","8","test_amount_is_taken_only_from_payment_intent_payloads","tests.webhook","2026-08-21","passed","2026-08-21","","test_handler","",""
+"Dedupe is on event id, and it must win even when the replay claims more.
+
+The replay here claims `refunded`, which outranks `succeeded`. If dedupe
+were missing, the state would advance and this test would catch it. Rank
+alone would not, because refunded is a legitimate next state.
+","22","test_a_replayed_event_id_is_dropped_without_reapplying","tests.webhook","2026-08-21","passed","2026-08-21","","test_handler","",""
+"","8","test_startup_creates_the_schema","tests","2026-08-21","passed","2026-08-21","","test_startup","",""
+"Every permutation of one lifecycle converges on the same state.
+
+The contract asks for succeeded before processing. All six orderings are
+run instead, because the claim is about the set and testing one reversal
+would leave the general case asserted only by argument.
+","15","test_final_state_is_independent_of_delivery_order[processing,created,succeeded]","tests.webhook","2026-08-21","passed","2026-08-21","","test_ordering","",""
+"Webhook dedupe leans on this constraint, not on a check-then-insert.","7","test_processed_events_rejects_duplicate_event_id","tests","2026-08-21","passed","2026-08-21","","test_db","",""
+"","0","test_worked_orderings_replay_as_documented[events7-refunded-False]","tests","2026-08-21","passed","2026-08-21","","test_table_matches_code","",""
+"Every permutation of one lifecycle converges on the same state.
+
+The contract asks for succeeded before processing. All six orderings are
+run instead, because the claim is about the set and testing one reversal
+would leave the general case asserted only by argument.
+","14","test_final_state_is_independent_of_delivery_order[created,succeeded,processing]","tests.webhook","2026-08-21","passed","2026-08-21","","test_ordering","",""
+"","1","test_worked_orderings_replay_as_documented[events10-processing-False]","tests","2026-08-21","passed","2026-08-21","","test_table_matches_code","",""
+"","0","test_unknown_event_is_absorbed_without_changing_state","tests","2026-08-21","passed","2026-08-21","","test_table_matches_code","",""
+"Anything other than a clear yes must leave the endpoint closed.","10","test_introspection_404s_when_testing_is_not_true[]","tests","2026-08-21","passed","2026-08-21","","test_introspection_gating","",""
+"Stage 06 redeemed the 501 this test used to assert.
+
+The creation seam is substituted rather than called. Without that this file
+would make a real Stripe call on every plain `pytest`, and a default run is
+supposed to need no network and no key.
+","4","test_payments_endpoint_is_implemented","tests","2026-08-21","passed","2026-08-21","","test_endpoints_scaffolded","",""
+"The replay claims more than the original, so only dedupe can absorb it.
+
+Redelivering the same event id with an identical payload proves nothing:
+the repeat claims a state of equal rank, and equal is not strictly higher,
+so the rank rule alone would absorb it and a broken dedupe would look
+healthy. That is the mutant that survived at stage 02.
+
+So the replay here carries a claim that outranks what is recorded. If the
+processed_events primary key did not arbitrate, the state would advance.
+
+This also stands in for ""one row in processed_events"", which is not visible
+through the introspection endpoint and which conventions forbid reading
+from the database. The handler proceeds past its dedupe insert only when
+that insert succeeded, so a state that did not advance is the observable
+form of the row already being there.
+","10","test_a_duplicate_event_id_is_dropped_by_id_and_not_by_rank","tests.webhook","2026-08-21","passed","2026-08-21","","test_ordering","",""
+"Found by mutating <= to < in apply(), which no other test caught.
+
+A duplicate claims the state it already holds, so the final state looks
+correct either way. The difference is only visible in absorbed, and it
+matters: stage 04b asserts that redelivery is a no-op, and stage 04a's
+dedupe is meant to be a second independent guard rather than the only one.
+","0","test_duplicate_event_is_absorbed_not_reapplied","tests","2026-08-21","passed","2026-08-21","","test_table_matches_code","",""
+"State is a high water mark, so nothing below it can be written over it.
+
+payment_failed is the case worth naming: Stripe genuinely returns a failed
+PaymentIntent to requires_payment_method so it can be retried, and the
+table deliberately refuses that regression. The recorded state is the
+furthest progress ever observed, not Stripe's instantaneous status.
+
+None of these is an anomaly. Absorbing a late event is the design working,
+and flagging it would fire on every reordered delivery and teach a reader
+to ignore the flag.
+","12","test_a_stale_event_after_a_terminal_state_is_absorbed_not_applied[amount_capturable_updated]","tests.webhook","2026-08-21","passed","2026-08-21","","test_ordering","",""
+"The contract's third case, and the reason the primary key is the arbiter.
+
+Eight threads, one key. The assertion is on the count of payments created,
+not on the response codes: a mix of one 200 and seven 409s is correct, and
+so is any other split, because Stripe itself answers 409 while a request
+holding the key is still in flight. Two payments is the bug.
+
+Checking whether a key exists before inserting it would pass this most of
+the time, which is worse than failing. The window between the check and the
+insert is small enough to miss on a quiet machine and wide enough to lose
+money on a busy one.
+","32","test_concurrent_duplicates_create_exactly_one_payment","tests.idempotency","2026-08-21","passed","2026-08-21","","test_idempotency","",""
+"","1","test_worked_orderings_replay_as_documented[events2-succeeded-False]","tests","2026-08-21","passed","2026-08-21","","test_table_matches_code","",""
+"","10","test_a_legal_transition_records_no_anomaly","tests.webhook","2026-08-21","passed","2026-08-21","","test_handler","",""
+"","8","test_init_creates_the_three_tables","tests","2026-08-21","passed","2026-08-21","","test_db","",""
+"capture_method=manual is what puts a PaymentIntent in requires_capture.
+
+Stage 02 ranks requires_capture below processing on the strength of the
+documented claim that capturing moves the intent onward. This test is where
+that ordering meets the real API.
+","1936","test_manual_capture_makes_authorize_and_capture_two_steps","tests.lifecycle","2026-08-21","passed","2026-08-21","","test_lifecycle","",""
+"A PaymentIntent with no payment method attached cannot go anywhere yet.","0","test_create_leaves_the_intent_awaiting_a_payment_method","tests.lifecycle","2026-08-21","passed","2026-08-21","","test_lifecycle","",""
+"Implemented at stage 04a, so it no longer stubs. It refuses instead.
+
+An unsigned body is the cheapest proof the front door is actually locked.
+The full signature suite lives in tests/webhook/test_signature.py.
+","3","test_webhook_endpoint_rejects_an_unsigned_request","tests","2026-08-21","passed","2026-08-21","","test_endpoints_scaffolded","",""
+"","2","test_connection_uses_wal_mode","tests","2026-08-21","passed","2026-08-21","","test_db","",""
+"","0","test_worked_orderings_replay_as_documented[events1-succeeded-False]","tests","2026-08-21","passed","2026-08-21","","test_table_matches_code","",""
+"","21","test_a_session_without_a_payment_intent_is_acknowledged","tests.webhook","2026-08-21","passed","2026-08-21","","test_handler","",""
+"","0","test_state_ranks_match_the_table","tests","2026-08-21","passed","2026-08-21","","test_table_matches_code","",""
+"The deployed URL is what someone pastes, so it must not answer an error.
+
+A named route rather than a mount at /, which would be a catch all and would
+make the 501 and 404 responses above meaningless.
+","3","test_root_redirects_to_the_demo_page","tests","2026-08-21","passed","2026-08-21","","test_endpoints_scaffolded","",""
+"","0","test_tampered_signature_is_rejected","tests.webhook","2026-08-21","passed","2026-08-21","","test_signature","",""
+"Confirmed empirically: data.object is a charge, the intent id is a field on it.","0","test_charge_events_use_the_payment_intent_field","tests.webhook","2026-08-21","passed","2026-08-21","","test_resolution","",""
+"Just inside the SDK's 300 second tolerance, confirmed as DEFAULT_TOLERANCE.
+
+math.ceil, not int. int() truncates downward, so `int(time.time()) - 299`
+signs a timestamp that is really 299 plus the current fraction of a second
+old, up to 299.999. If the clock ticks over before the verifier reads it,
+the event is 300 seconds old and correctly rejected, and the test fails
+while testing nothing. ceil rounds the age down instead, so the payload is
+at most 299 seconds old whenever it is checked.
+
+The flake this avoids is worse than a normal one: repeated runs land in the
+same second, so it fails every time or never, which reads as a real bug.
+","1","test_signature_299_seconds_old_is_accepted","tests.webhook","2026-08-21","passed","2026-08-21","","test_signature","",""
+"Anything other than a clear yes must leave the endpoint closed.","10","test_introspection_404s_when_testing_is_not_true[False]","tests","2026-08-21","passed","2026-08-21","","test_introspection_gating","",""
+"Anything other than a clear yes must leave the endpoint closed.","10","test_introspection_404s_when_testing_is_not_true[0]","tests","2026-08-21","passed","2026-08-21","","test_introspection_gating","",""
+"Every permutation of one lifecycle converges on the same state.
+
+The contract asks for succeeded before processing. All six orderings are
+run instead, because the claim is about the set and testing one reversal
+would leave the general case asserted only by argument.
+","15","test_final_state_is_independent_of_delivery_order[processing,succeeded,created]","tests.webhook","2026-08-21","passed","2026-08-21","","test_ordering","",""
+"D-014 and D-015: leaving canceled is impossible, so it is flagged and kept.","11","test_an_illegal_transition_is_applied_and_recorded","tests.webhook","2026-08-21","passed","2026-08-21","","test_handler","",""
+"The header is optional, and its absence means no promise was asked for.
+
+Stripe behaves the same way. Caching regardless would silently change what
+an unkeyed request means, which is the kind of helpfulness that loses money.
+","4","test_without_a_key_every_request_is_a_new_payment","tests.idempotency","2026-08-21","passed","2026-08-21","","test_idempotency","",""
+"Every permutation of one lifecycle converges on the same state.
+
+The contract asks for succeeded before processing. All six orderings are
+run instead, because the claim is about the set and testing one reversal
+would leave the general case asserted only by argument.
+","14","test_final_state_is_independent_of_delivery_order[succeeded,created,processing]","tests.webhook","2026-08-21","passed","2026-08-21","","test_ordering","",""
+"","1","test_worked_orderings_replay_as_documented[events4-succeeded-False]","tests","2026-08-21","passed","2026-08-21","","test_table_matches_code","",""
+"State is a high water mark, so nothing below it can be written over it.
+
+payment_failed is the case worth naming: Stripe genuinely returns a failed
+PaymentIntent to requires_payment_method so it can be retried, and the
+table deliberately refuses that regression. The recorded state is the
+furthest progress ever observed, not Stripe's instantaneous status.
+
+None of these is an anomaly. Absorbing a late event is the design working,
+and flagging it would fire on every reordered delivery and teach a reader
+to ignore the flag.
+","12","test_a_stale_event_after_a_terminal_state_is_absorbed_not_applied[payment_failed]","tests.webhook","2026-08-21","passed","2026-08-21","","test_ordering","",""
+"A failed attempt must not burn the key for the next twenty-four hours.
+
+Retrying after an error is the ordinary case, not an abuse. If the key were
+held, every retry would answer 409 until the TTL expired, and the caller's
+only recourse would be to invent a new key, which defeats the point of
+having one.
+","13","test_a_key_is_released_when_the_work_fails","tests.idempotency","2026-08-21","passed","2026-08-21","","test_idempotency","",""
+"D-013 leans on this, and until now nothing enforced it.
+
+The argument that the introspection gate is structural rather than a status
+code is only as good as the schema staying this small. The root redirect is
+deliberately absent because it is not part of the API surface, and
+/test/payments/{id} is absent because the route is not registered at all
+unless TESTING is true.
+","6","test_the_schema_lists_exactly_the_three_real_routes","tests","2026-08-21","passed","2026-08-21","","test_endpoints_scaffolded","",""
+"","0","test_checkout_session_events_use_the_payment_intent_field","tests.webhook","2026-08-21","passed","2026-08-21","","test_resolution","",""
+"","13","test_introspection_available_when_testing_true","tests","2026-08-21","passed","2026-08-21","","test_introspection_gating","",""
+"Fill only what is missing. A later payload must not replace a good figure.","10","test_an_absorbed_event_never_overwrites_an_amount_already_known","tests.webhook","2026-08-21","passed","2026-08-21","","test_handler","",""
+"","0","test_worked_orderings_replay_as_documented[events9-refunded-False]","tests","2026-08-21","passed","2026-08-21","","test_table_matches_code","",""
+"","7","test_an_unknown_payment_is_created_on_first_sighting","tests.webhook","2026-08-21","passed","2026-08-21","","test_handler","",""
+"Every permutation of one lifecycle converges on the same state.
+
+The contract asks for succeeded before processing. All six orderings are
+run instead, because the claim is about the set and testing one reversal
+would leave the general case asserted only by argument.
+","15","test_final_state_is_independent_of_delivery_order[created,processing,succeeded]","tests.webhook","2026-08-21","passed","2026-08-21","","test_ordering","",""
+"Cancellation is terminal, which is what makes it absorbing in the table.","258","test_cancel_moves_an_unconfirmed_intent_to_canceled","tests.lifecycle","2026-08-21","passed","2026-08-21","","test_lifecycle","",""
+"Dedupe drops the event, not the payment. A rollback must not leave state stuck.","13","test_a_duplicate_does_not_wedge_the_payment_for_later_events","tests.webhook","2026-08-21","passed","2026-08-21","","test_ordering","",""
+"A rejected or absorbed event is exactly what 04b needs to see.","1","test_absorbed_transition_is_still_logged","tests","2026-08-21","passed","2026-08-21","","test_logging","",""
