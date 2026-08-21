@@ -80,7 +80,33 @@ flowchart TD
     X --> DB
     B -->|"fills a missing amount only"| DB
     DB[("SQLite in WAL mode<br/>payments, processed_events, anomalies")]
+
+    style R fill:#F7F9FC,stroke:#CDD5E0,color:#4A5568
+
+    classDef source fill:#EDF0F5,stroke:#78849A,color:#15181D
+    classDef gate fill:#DFE8FA,stroke:#3A5CA6,color:#15181D
+    classDef concur fill:#D8EEEA,stroke:#2A7A71,color:#15181D
+    classDef dedupe fill:#E8E2F6,stroke:#5C48A6,color:#15181D
+    classDef decide fill:#E3E8EF,stroke:#485466,color:#15181D
+    classDef apply fill:#D8EDD9,stroke:#2C7B30,color:#15181D
+    classDef absorb fill:#E9E9EC,stroke:#69707D,color:#15181D
+    classDef anomaly fill:#F9E8CE,stroke:#A5711A,color:#15181D
+    classDef reject fill:#F9DCDC,stroke:#AC3939,color:#15181D
+    classDef store fill:#2E3440,stroke:#2E3440,color:#F5F7FA
+
+    class S source
+    class V gate
+    class E reject
+    class T,L concur
+    class D,DROP dedupe
+    class P,C decide
+    class A apply
+    class B absorb
+    class X anomaly
+    class DB store
 ```
+
+Colour groups the steps by what they do rather than decorating them: the signature gate in blue, the concurrency machinery in teal, deduplication in violet, the resolve and rank decision in slate, and the three outcomes in green, grey and amber. Red is the one path that returns an error.
 
 **1. Verify the raw bytes.** The body must be the exact bytes Stripe sent, so
 the handler reads `request.body()` rather than a parsed model. A re-serialized
