@@ -6,6 +6,7 @@ from pathlib import Path
 
 import stripe
 from fastapi import Body, FastAPI, HTTPException, Request
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
@@ -331,6 +332,22 @@ if config.TESTING:
             "updated_at": row["updated_at"],
             "anomaly_count": anomalies,
         }
+
+
+# A named route, not a mount. The root used to answer 404, which is correct for
+# an unmatched path and wrong as a front door: the deployed URL is what someone
+# pastes, and a raw error body is the first thing they see.
+#
+# include_in_schema=False keeps /openapi.json listing exactly the three real
+# routes, which is what D-013 leans on as evidence that the introspection gate
+# is structural rather than a status code. A redirect is not part of the API
+# surface, so it does not belong in the schema.
+#
+# This does not reintroduce the catch all the mount below avoids: it matches the
+# root and nothing else, so an unknown path still 404s.
+@app.get("/", include_in_schema=False)
+async def root():
+    return RedirectResponse("/app/")
 
 
 # Mounted at /app rather than /. A mount at the root is a catch all: it answers

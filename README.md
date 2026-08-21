@@ -205,13 +205,13 @@ Charge. Since the PaymentIntent is the canonical record, a refund lands here.
 
 ## Try it live
 
-**<https://stripe-reconciler-w6m7.onrender.com>**
+**<https://stripe-reconciler-w6m7.onrender.com/app/>**
 
 | Path | What you get |
 |---|---|
 | [`/health`](https://stripe-reconciler-w6m7.onrender.com/health) | status, and the pinned Stripe API version |
 | [`/docs`](https://stripe-reconciler-w6m7.onrender.com/docs) | interactive Swagger UI for the whole surface |
-| [`/app`](https://stripe-reconciler-w6m7.onrender.com/app) | the demo page, which starts a real hosted Checkout session |
+| [`/app/`](https://stripe-reconciler-w6m7.onrender.com/app/) | the demo page, which starts a real hosted Checkout session |
 
 Two constraints worth stating rather than letting you discover them.
 

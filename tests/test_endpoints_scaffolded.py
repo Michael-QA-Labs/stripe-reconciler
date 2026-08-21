@@ -45,3 +45,29 @@ def test_webhook_endpoint_rejects_an_unsigned_request():
 def test_unknown_route_is_404_not_501():
     """Guards against a catch-all that would make the 501s meaningless."""
     assert client.post("/nope").status_code == 404
+
+
+def test_root_redirects_to_the_demo_page():
+    """The deployed URL is what someone pastes, so it must not answer an error.
+
+    A named route rather than a mount at /, which would be a catch all and would
+    make the 501 and 404 responses above meaningless.
+    """
+    response = client.get("/", follow_redirects=False)
+
+    assert response.status_code in (307, 308)
+    assert response.headers["location"] == "/app/"
+
+
+def test_the_schema_lists_exactly_the_three_real_routes():
+    """D-013 leans on this, and until now nothing enforced it.
+
+    The argument that the introspection gate is structural rather than a status
+    code is only as good as the schema staying this small. The root redirect is
+    deliberately absent because it is not part of the API surface, and
+    /test/payments/{id} is absent because the route is not registered at all
+    unless TESTING is true.
+    """
+    paths = client.get("/openapi.json").json()["paths"]
+
+    assert sorted(paths) == ["/health", "/payments", "/webhook"]
