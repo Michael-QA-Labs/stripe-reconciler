@@ -1,5 +1,8 @@
 # stripe-reconciler
 
+[![CI](https://github.com/Michael-QA-Labs/stripe-reconciler/actions/workflows/ci.yml/badge.svg)](https://github.com/Michael-QA-Labs/stripe-reconciler/actions/workflows/ci.yml)
+[![coverage](https://img.shields.io/endpoint?url=https://michael-qa-labs.github.io/stripe-reconciler/coverage.json)](https://michael-qa-labs.github.io/stripe-reconciler/)
+
 A Stripe webhook receiver that implements its own event sequencing and
 idempotency logic, plus the test suite that proves the logic works.
 
@@ -230,6 +233,27 @@ failure mode heals itself using the same machinery the repo exists to
 demonstrate.
 
 The live URL is a demo endpoint, not a durable store.
+
+## The test report
+
+**[Browse the full Allure report](https://michael-qa-labs.github.io/stripe-reconciler/)**
+
+Published on every push to `main`, covering the offline suite and the real
+Stripe suite in one report: 87 tests, with the trend carried across runs rather
+than rebuilt from scratch each time. Every test carries its own reasoning, so
+the report is readable as an argument rather than only as a pass count.
+
+Coverage of `service/` sits at 97 percent, measured by the same run that
+publishes the report. The badge above reads from a JSON endpoint written beside
+it, so the number cannot drift from the run that produced it.
+
+What is deliberately not claimed here is a mutation score. Coverage says a line
+executed, not that anything would notice if it broke. Every stage of this build
+checked that separately by deleting code and confirming the suite went red, and
+the results are recorded in the stage notes: removing the precedence check kills
+11 of 17 ordering tests, and dropping the idempotency key's unique constraint
+produces eight payments where one is correct. Automating that with mutmut is v2's
+job, so the README does not promise a figure it does not yet measure.
 
 ## How the tests are split, and why
 
