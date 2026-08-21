@@ -1,4 +1,4 @@
-# Handoff — stripe-reconciler
+# Handoff: stripe-reconciler
 
 State as of **2026-08-20**. Written for whoever picks up stage 07, human or
 agent. Facts only; anything reconstructable from the repo or git log is left out.
@@ -128,8 +128,9 @@ Both live in `_shared/conventions.md`, which every stage loads every run.
 - **Cite a decision, route it.** A file citing `D-NNN` must list `DECISIONS.md`
   in its Inputs. Four of nine stages were wrong before this rule existed.
 - **Outputs name principal artifacts.** A supporting file serving a named
-  artifact is implied. Anything else — a new module, endpoint, dependency, or
-  committed asset — is named in the contract or asked about first.
+  artifact is implied. Anything else, meaning a new module, endpoint,
+  dependency, or committed asset, is named in the contract or asked about
+  first.
 
 ---
 
